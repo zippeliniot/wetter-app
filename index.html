@@ -1051,6 +1051,7 @@
         scales:{
           x: xAxisCfg(),
           y:{ beginAtZero:true, ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+' km/h' }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          _r:{ position:'right', ticks:{ display:false, callback: v => v+'mm' }, grid:{ drawOnChartArea:false } },
         },
         animation:{ duration:350 },
         layout:{ padding:{ top: 18 } },       // room for arrows above bars
