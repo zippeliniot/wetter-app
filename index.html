@@ -165,6 +165,7 @@
     .cl-line  { width: 16px; height: 2px; border-radius: 2px; }
     .cl-bar   { width: 11px; height: 11px; border-radius: 2px; opacity: 0.90; }
     .cl-swatch{ width: 11px; height: 11px; border-radius: 2px; }
+    .cl-dash  { width: 18px; height: 0; border-top: 2px dashed; opacity: 0.9; }
 
     .chart-card canvas { display: block; width: 100% !important; }
 
@@ -375,8 +376,8 @@
       <div class="chart-legend">
         <div class="cl-item"><div class="cl-line" style="background:#FFB830;"></div><span style="color:#FFB830;">HH Temp.</span></div>
         <div class="cl-item"><div class="cl-line" style="background:#4DD9FF;"></div><span style="color:#4DD9FF;">GR Temp.</span></div>
-        <div class="cl-item"><div class="cl-bar"  style="background:#FFB830;"></div>HH Regen</div>
-        <div class="cl-item"><div class="cl-bar"  style="background:#4DD9FF;"></div>GR Regen</div>
+        <div class="cl-item"><div class="cl-dash" style="border-color:#FFB830;"></div>HH Regen</div>
+        <div class="cl-item"><div class="cl-dash" style="border-color:#4DD9FF;"></div>GR Regen</div>
       </div>
     </div>
     <canvas id="temp-chart" height="160"></canvas>
@@ -633,6 +634,13 @@
   /* ══════════════════════════════════════════════════════
      WIND COLOUR HELPERS
   ══════════════════════════════════════════════════════ */
+  function rainDotColor(v) {
+    if (v < 0.5) return 'rgba(74,222,128,0.95)';   // grün
+    if (v < 1.0) return 'rgba(250,204,21,0.95)';   // gelb
+    if (v < 2.0) return 'rgba(251,146,60,0.95)';   // orange
+    return             'rgba(239,68,68,0.95)';      // rot
+  }
+
   function windFill(v) {
     if (v <= 15) return 'rgba(74,222,128,0.80)';
     if (v <= 25) return 'rgba(250,204,21,0.80)';
@@ -727,9 +735,9 @@
       data: {
         labels,
         datasets: [
-          // rain bars (order 3+4 = behind lines)
-          { type:'bar',  label:'HH Regen', data:rains[0], backgroundColor:COL[0].bar, borderColor:COL[0].barB, borderWidth:1, borderRadius:2, yAxisID:'yRain', order:3 },
-          { type:'bar',  label:'GR Regen', data:rains[1], backgroundColor:COL[1].bar, borderColor:COL[1].barB, borderWidth:1, borderRadius:2, yAxisID:'yRain', order:4 },
+          // rain dotted lines (order 3+4 = behind temp lines)
+          { type:'line', label:'HH Regen', data:rains[0], borderColor:'rgba(255,184,48,0.55)', borderWidth:1.5, borderDash:[4,4], pointRadius:rains[0].map(v=>v>0?4:0), pointBackgroundColor:rains[0].map(rainDotColor), pointBorderWidth:0, tension:0.3, fill:false, yAxisID:'yRain', order:3 },
+          { type:'line', label:'GR Regen', data:rains[1], borderColor:'rgba(77,217,255,0.55)',  borderWidth:1.5, borderDash:[4,4], pointRadius:rains[1].map(v=>v>0?4:0), pointBackgroundColor:rains[1].map(rainDotColor), pointBorderWidth:0, tension:0.3, fill:false, yAxisID:'yRain', order:4 },
           // temp lines (order 1+2 = in front)
           { type:'line', label:'HH Temp.', data:temps[0], codes:codes[0], borderColor:COL[0].line, backgroundColor:grads[0], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:1 },
           { type:'line', label:'GR Temp.', data:temps[1], codes:codes[1], borderColor:COL[1].line, backgroundColor:grads[1], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:2 },
@@ -758,8 +766,12 @@
   function updateTempData(allData, range, animate) {
     const { labels, temps, codes, rains } = prepTempData(allData, range);
     tempChart.data.labels = labels;
-    tempChart.data.datasets[0].data  = rains[0];
-    tempChart.data.datasets[1].data  = rains[1];
+    tempChart.data.datasets[0].data                 = rains[0];
+    tempChart.data.datasets[0].pointRadius          = rains[0].map(v => v > 0 ? 4 : 0);
+    tempChart.data.datasets[0].pointBackgroundColor = rains[0].map(rainDotColor);
+    tempChart.data.datasets[1].data                 = rains[1];
+    tempChart.data.datasets[1].pointRadius          = rains[1].map(v => v > 0 ? 4 : 0);
+    tempChart.data.datasets[1].pointBackgroundColor = rains[1].map(rainDotColor);
     tempChart.data.datasets[2].data  = temps[0];
     tempChart.data.datasets[2].codes = codes[0];
     tempChart.data.datasets[3].data  = temps[1];
