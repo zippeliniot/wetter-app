@@ -692,6 +692,7 @@
       chart.data.datasets.forEach((ds, dsIdx) => {
         if (!ds.codes) return;
         const meta = chart.getDatasetMeta(dsIdx);
+        if (ds.hidden || meta.hidden) return;
         ctx.save();
         ctx.font = '13px sans-serif';
         ctx.textAlign    = 'center';
