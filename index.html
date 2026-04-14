@@ -252,25 +252,23 @@
 <div class="page">
 
   <div class="header-bar">
-    <h1>Wetter</h1>
+    <h1>Wetterbericht</h1>
     <div class="range-toggle">
       <button class="range-btn active" id="btn1" onclick="setRange(1)">1 Tag</button>
       <button class="range-btn"        id="btn3" onclick="setRange(3)">3 Tage</button>
     </div>
   </div>
 
-  <!-- ── Temp + Rain chart ────────────────────────────── -->
+  <!-- ── Temperatur chart ─────────────────────────────── -->
   <div class="card">
     <div class="chart-head">
-      <span class="card-title" style="margin-bottom:0;">Temperatur &amp; Niederschlag</span>
+      <span class="card-title" style="margin-bottom:0;">Temperatur</span>
       <div class="chart-legend">
-        <div class="cl-item"><div class="cl-line" style="background:#FFB830;"></div>HH Temp.</div>
-        <div class="cl-item"><div class="cl-line" style="background:#4DD9FF;"></div>GR Temp.</div>
-        <div class="cl-item"><div class="cl-bar"  style="background:#FFB830;"></div>HH Regen</div>
-        <div class="cl-item"><div class="cl-bar"  style="background:#4DD9FF;"></div>GR Regen</div>
+        <div class="cl-item"><div class="cl-line" style="background:#FFB830;"></div><span style="color:#FFB830;">Hamburg</span></div>
+        <div class="cl-item"><div class="cl-line" style="background:#4DD9FF;"></div><span style="color:#4DD9FF;">Gronenberg</span></div>
       </div>
     </div>
-    <canvas id="combo-chart" height="160"></canvas>
+    <canvas id="temp-chart" height="160"></canvas>
   </div>
 
   <!-- ── Wind chart (Gronenberg only) ─────────────────── -->
@@ -352,7 +350,7 @@
   ══════════════════════════════════════════════════════ */
   let currentRange = 1;
   let cachedData   = null;
-  let comboChart   = null;
+  let tempChart    = null;
   let windChart    = null;
   let shellBuilt   = false;
 
@@ -365,7 +363,7 @@
       current: ['temperature_2m','relative_humidity_2m','apparent_temperature',
                 'weather_code','wind_speed_10m','wind_direction_10m',
                 'precipitation','uv_index'].join(','),
-      hourly:  ['temperature_2m','precipitation','wind_speed_10m','wind_direction_10m'].join(','),
+      hourly:  ['temperature_2m','precipitation','wind_speed_10m','wind_direction_10m','weather_code'].join(','),
       daily:   ['weather_code','temperature_2m_max','temperature_2m_min',
                 'precipitation_sum'].join(','),
       timezone: 'Europe/Berlin',
@@ -442,9 +440,9 @@
   }
 
   /* ══════════════════════════════════════════════════════
-     CHART DATA PREP (temp + rain)
+     CHART DATA PREP (temperature + weather codes)
   ══════════════════════════════════════════════════════ */
-  function prepComboData(allData, range) {
+  function prepTempData(allData, range) {
     const step  = range === 1 ? 1 : 2;
     const src   = allData[0].hourly.time;
     const start = startIndex(src);
@@ -465,18 +463,14 @@
       return out;
     });
 
-    const rains = allData.map(d => {
+    const codes = allData.map(d => {
       const out = [];
-      for (let i = start; i < end; i += step) {
-        let s = 0;
-        for (let j = i; j < Math.min(i + step, end, d.hourly.time.length); j++)
-          s += (d.hourly.precipitation[j] ?? 0);
-        out.push(Math.round(s * 10) / 10);
-      }
+      for (let i = start; i < end; i += step)
+        out.push(d.hourly.weather_code[i] ?? 0);
       return out;
     });
 
-    return { labels, temps, rains };
+    return { labels, temps, codes };
   }
 
   /* ══════════════════════════════════════════════════════
@@ -553,11 +547,39 @@
   };
 
   /* ══════════════════════════════════════════════════════
-     COMBO CHART — init once
+     WEATHER SYMBOL PLUGIN — emojis on temperature curves
   ══════════════════════════════════════════════════════ */
-  function initComboChart(allData, range) {
-    const { labels, temps, rains } = prepComboData(allData, range);
-    const ctx = document.getElementById('combo-chart').getContext('2d');
+  const weatherSymbolPlugin = {
+    id: 'weatherSymbols',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const everyN = chart._symEvery ?? 3;
+
+      chart.data.datasets.forEach((ds, dsIdx) => {
+        if (!ds.codes) return;
+        const meta = chart.getDatasetMeta(dsIdx);
+        ctx.save();
+        ctx.font = '13px sans-serif';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'bottom';
+        ds.codes.forEach((code, i) => {
+          if (i % everyN !== 0) return;
+          const pt = meta.data[i];
+          if (!pt) return;
+          const [, emoji] = wmo(code ?? 0);
+          ctx.fillText(emoji, pt.x, pt.y - 5);
+        });
+        ctx.restore();
+      });
+    },
+  };
+
+  /* ══════════════════════════════════════════════════════
+     TEMP CHART — init once
+  ══════════════════════════════════════════════════════ */
+  function initTempChart(allData, range) {
+    const { labels, temps, codes } = prepTempData(allData, range);
+    const ctx = document.getElementById('temp-chart').getContext('2d');
 
     const grads = allData.map((_, i) => {
       const g = ctx.createLinearGradient(0, 0, 0, 240);
@@ -565,41 +587,51 @@
       return g;
     });
 
-    comboChart = new Chart(ctx, {
+    tempChart = new Chart(ctx, {
+      type: 'line',
       data: {
         labels,
-        datasets: [
-          { type:'bar',  label:'HH Regen', data:rains[0], backgroundColor:COL[0].bar, borderColor:COL[0].barB, borderWidth:1, borderRadius:2, yAxisID:'yRain', order:3 },
-          { type:'bar',  label:'GR Regen', data:rains[1], backgroundColor:COL[1].bar, borderColor:COL[1].barB, borderWidth:1, borderRadius:2, yAxisID:'yRain', order:4 },
-          { type:'line', label:'HH Temp.', data:temps[0], borderColor:COL[0].line, backgroundColor:grads[0], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:1 },
-          { type:'line', label:'GR Temp.', data:temps[1], borderColor:COL[1].line, backgroundColor:grads[1], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:2 },
-        ],
+        datasets: allData.map((_, i) => ({
+          label: CITIES[i].name,
+          data:  temps[i],
+          codes: codes[i],
+          borderColor:     COL[i].line,
+          backgroundColor: grads[i],
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.30,
+          fill: true,
+        })),
       },
       options: {
-        responsive:true, maintainAspectRatio:true,
-        interaction:{ mode:'index', intersect:false },
-        plugins:{
-          legend:{ display:false },
-          tooltip:{ callbacks:{ label: c => ` ${c.dataset.label}: ${c.parsed.y}${c.datasetIndex < 2 ? ' mm' : '°C'}` }},
+        responsive: true, maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y}°C` }},
         },
-        scales:{
-          x:{ ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
-          yTemp:{ position:'left',  ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
-          yRain:{ position:'right', beginAtZero:true, ticks:{ color:'rgba(140,210,255,0.90)', font:{size:11}, callback: v => v+'mm' }, grid:{ drawOnChartArea:false }},
+        scales: {
+          x: { ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          y: { ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
         },
-        animation:{ duration:350 },
+        animation: { duration: 350 },
+        layout: { padding: { top: 24 } },  // room for symbols above lines
       },
+      plugins: [weatherSymbolPlugin],
     });
+    tempChart._symEvery = range === 1 ? 3 : 4;
   }
 
-  function updateComboData(allData, range, animate) {
-    const { labels, temps, rains } = prepComboData(allData, range);
-    comboChart.data.labels = labels;
-    comboChart.data.datasets[0].data = rains[0];
-    comboChart.data.datasets[1].data = rains[1];
-    comboChart.data.datasets[2].data = temps[0];
-    comboChart.data.datasets[3].data = temps[1];
-    comboChart.update(animate ? undefined : 'none');
+  function updateTempData(allData, range, animate) {
+    const { labels, temps, codes } = prepTempData(allData, range);
+    tempChart.data.labels = labels;
+    allData.forEach((_, i) => {
+      tempChart.data.datasets[i].data  = temps[i];
+      tempChart.data.datasets[i].codes = codes[i];
+    });
+    tempChart._symEvery = range === 1 ? 3 : 4;
+    tempChart.update(animate ? undefined : 'none');
   }
 
   /* ══════════════════════════════════════════════════════
@@ -709,7 +741,7 @@
     document.getElementById('btn1').classList.toggle('active', days === 1);
     document.getElementById('btn3').classList.toggle('active', days === 3);
     if (cachedData) {
-      updateComboData(cachedData, currentRange, true);
+      updateTempData(cachedData, currentRange, true);
       updateWindData(cachedData, currentRange, true);
     }
   }
@@ -729,12 +761,12 @@
       buildShell(allData);
       updateCards(allData);
       requestAnimationFrame(() => {
-        initComboChart(allData, currentRange);
+        initTempChart(allData, currentRange);
         initWindChart(allData, currentRange);
       });
     } else {
       updateCards(allData);
-      updateComboData(allData, currentRange, false);
+      updateTempData(allData, currentRange, false);
       updateWindData(allData, currentRange, false);
     }
 
