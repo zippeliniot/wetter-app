@@ -404,6 +404,15 @@
     <canvas id="wind-chart" height="120"></canvas>
   </div>
 
+  <!-- ── Ostsee Wassertemperatur ──────────────────────── -->
+  <div class="card" id="sea-card">
+    <div class="chart-head">
+      <span class="card-title" style="margin-bottom:0;">🌊 Ostsee · Scharbeutz</span>
+      <span id="sea-current" style="font-size:1.05rem;font-weight:700;opacity:0.9;"></span>
+    </div>
+    <canvas id="sea-chart" height="80"></canvas>
+  </div>
+
   <!-- ── 7-day forecast ───────────────────────────────── -->
   <div class="card">
     <div class="card-title">7-Tage-Vorschau</div>
@@ -481,8 +490,10 @@
   let currentRange    = 1;
   let currentLocation = localStorage.getItem('wetter-loc') || 'all';
   let cachedData      = null;
+  let marineCache     = null;
   let tempChart       = null;
   let windChart       = null;
+  let seaChart        = null;
   let shellBuilt      = false;
 
   /* ══════════════════════════════════════════════════════
@@ -502,6 +513,18 @@
     });
     const r = await fetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }
+
+  async function fetchMarine() {
+    const p = new URLSearchParams({
+      latitude: 54.02334, longitude: 10.77672,
+      hourly:   'sea_surface_temperature',
+      timezone: 'Europe/Berlin',
+      forecast_days: 7,
+    });
+    const r = await fetch(`https://marine-api.open-meteo.com/v1/marine?${p}`);
+    if (!r.ok) throw new Error(`Marine HTTP ${r.status}`);
     return r.json();
   }
 
@@ -925,6 +948,80 @@
   }
 
   /* ══════════════════════════════════════════════════════
+     OSTSEE WASSERTEMPERATUR
+  ══════════════════════════════════════════════════════ */
+  function prepSeaData(marine, range) {
+    const step  = range === 1 ? 1 : 2;
+    const src   = marine.hourly.time;
+    const temps = marine.hourly.sea_surface_temperature;
+    const start = startIndex(src);
+    const end   = Math.min(start + range * 24, src.length);
+
+    const labels = [], values = [];
+    for (let i = start; i < end; i += step) {
+      const d = new Date(src[i]);
+      labels.push(range === 1
+        ? `${String(d.getHours()).padStart(2,'0')}:00`
+        : `${DN[d.getDay()]} ${String(d.getHours()).padStart(2,'0')}h`);
+      values.push(temps[i] != null ? Math.round(temps[i] * 10) / 10 : null);
+    }
+    return { labels, values };
+  }
+
+  function initSeaChart(marine, range) {
+    const { labels, values } = prepSeaData(marine, range);
+    const ctx = document.getElementById('sea-chart').getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 120);
+    grad.addColorStop(0, 'rgba(0,200,220,0.30)');
+    grad.addColorStop(1, 'rgba(0,200,220,0)');
+
+    seaChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Wassertemperatur',
+          data: values,
+          borderColor: '#00C8DC',
+          backgroundColor: grad,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.35,
+          fill: true,
+          spanGaps: true,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ` ${c.parsed.y} °C` }},
+        },
+        scales: {
+          x: { ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          y: { ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
+        },
+        animation: { duration: 350 },
+      },
+    });
+
+    // Aktuellen Wert im Kartenkopf
+    const cur = values.find(v => v != null);
+    if (cur != null) document.getElementById('sea-current').textContent = cur + ' °C';
+  }
+
+  function updateSeaData(marine, range, animate) {
+    const { labels, values } = prepSeaData(marine, range);
+    seaChart.data.labels = labels;
+    seaChart.data.datasets[0].data = values;
+    seaChart.update(animate ? undefined : 'none');
+    const cur = values.find(v => v != null);
+    if (cur != null) document.getElementById('sea-current').textContent = cur + ' °C';
+  }
+
+  /* ══════════════════════════════════════════════════════
      SETTINGS MENU
   ══════════════════════════════════════════════════════ */
   function toggleMenu(e) {
@@ -995,6 +1092,7 @@
     if (cachedData) {
       updateTempData(cachedData, currentRange, true);
       updateWindData(cachedData, currentRange, true);
+      if (marineCache) updateSeaData(marineCache, currentRange, true);
     }
   }
 
@@ -1003,11 +1101,15 @@
   ══════════════════════════════════════════════════════ */
   async function loadAll(silent = false) {
     setStatus('loading');
-    const results = await Promise.allSettled(CITIES.map(c => fetchCity(c)));
+    const [results, marineRaw] = await Promise.all([
+      Promise.allSettled(CITIES.map(c => fetchCity(c))),
+      fetchMarine().catch(() => null),
+    ]);
     if (!results.every(r => r.status === 'fulfilled')) { setStatus('error'); return; }
 
     const allData = results.map(r => r.value);
     cachedData = allData;
+    if (marineRaw) marineCache = marineRaw;
 
     if (!shellBuilt) {
       buildShell(allData);
@@ -1015,12 +1117,14 @@
       requestAnimationFrame(() => {
         initTempChart(allData, currentRange);
         initWindChart(allData, currentRange);
+        if (marineCache) initSeaChart(marineCache, currentRange);
         applyLocationFilter();
       });
     } else {
       updateCards(allData);
       updateTempData(allData, currentRange, false);
       updateWindData(allData, currentRange, false);
+      if (marineCache) updateSeaData(marineCache, currentRange, false);
     }
 
     setStatus('ok');
