@@ -658,13 +658,7 @@
         },
       },
       grid: {
-        color: ctx => {
-          const label = ctx.chart.data.labels?.[ctx.index] ?? '';
-          const m = label.match(/(\d{2})(?::00|h)/);
-          return m && parseInt(m[1]) % 3 === 0
-            ? 'rgba(255,255,255,0.18)'   // jede 3h: deutliche Linie
-            : 'rgba(255,255,255,0.06)';  // jede Stunde: feine Linie
-        },
+        color: 'rgba(255,255,255,0.10)',
       },
     };
   }
