@@ -146,7 +146,8 @@
     /* sun / moon info rows */
     .fc-info-sep td { height: 8px; }
     .fc-info-row td { padding: 2px 3px; }
-    .fc-info-lbl    { font-size: 1.05rem; text-align: left !important; padding-left: 2px !important; }
+    .fc-info-lbl    { font-size: 1.05rem; text-align: left !important; padding-left: 2px !important; white-space: nowrap; }
+    .fc-lbl-txt     { font-size: 0.68rem; opacity: 0.75; margin-left: 3px; vertical-align: middle; }
     .fc-time        { font-size: 0.70rem; opacity: 0.80; }
 
     /* ══════════════════════════════════════════════════════
@@ -558,20 +559,20 @@
       ).join('')}
       <tr class="fc-info-sep"><td colspan="8"></td></tr>
       <tr class="fc-info-row">
-        <td class="fc-info-lbl">🌅</td>
+        <td class="fc-info-lbl">🌅<span class="fc-lbl-txt">Sonne</span></td>
         ${days.map((_,di) => `<td class="fc-time" id="fc-sr-${di}"></td>`).join('')}
       </tr>
       <tr class="fc-info-row">
-        <td class="fc-info-lbl">🌇</td>
+        <td class="fc-info-lbl">🌇<span class="fc-lbl-txt">Sonne</span></td>
         ${days.map((_,di) => `<td class="fc-time" id="fc-ss-${di}"></td>`).join('')}
       </tr>
       <tr class="fc-info-sep"><td colspan="8"></td></tr>
       <tr class="fc-info-row">
-        <td class="fc-info-lbl">🌕</td>
+        <td class="fc-info-lbl">🌕<span class="fc-lbl-txt">Mond</span></td>
         ${days.map((_,di) => `<td class="fc-time" id="fc-mr-${di}"></td>`).join('')}
       </tr>
       <tr class="fc-info-row">
-        <td class="fc-info-lbl">🌑</td>
+        <td class="fc-info-lbl">🌑<span class="fc-lbl-txt">Mond</span></td>
         ${days.map((_,di) => `<td class="fc-time" id="fc-ms-${di}"></td>`).join('')}
       </tr>`;
 
