@@ -642,6 +642,50 @@
   }
 
   /* ══════════════════════════════════════════════════════
+     TAG / NACHT HINTERGRUND
+  ══════════════════════════════════════════════════════ */
+  function isNightAt(isoStr) {
+    const date = new Date(isoStr);
+    const sun  = SunCalc.getTimes(date, CITIES[1].lat, CITIES[1].lon);
+    return date < sun.sunrise || date > sun.sunset;
+  }
+
+  const dayNightPlugin = {
+    id: 'dayNight',
+    beforeDatasetsDraw(chart) {
+      const { ctx, chartArea: a } = chart;
+      if (!a || !chart._isNight?.length) return;
+
+      // ersten Dataset mit gerenderten Punkten finden
+      let meta = null;
+      for (let i = 0; i < chart.data.datasets.length; i++) {
+        const m = chart.getDatasetMeta(i);
+        if (m.data?.length) { meta = m; break; }
+      }
+      if (!meta) return;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 8, 60, 0.32)';
+
+      const n = chart._isNight;
+      n.forEach((night, i) => {
+        if (!night) return;
+        const pt   = meta.data[i];
+        if (!pt) return;
+        const x1 = i === 0
+          ? a.left
+          : ((meta.data[i-1]?.x ?? pt.x) + pt.x) / 2;
+        const x2 = i === n.length - 1
+          ? a.right
+          : (pt.x + (meta.data[i+1]?.x ?? pt.x)) / 2;
+        ctx.fillRect(x1, a.top, x2 - x1, a.height);
+      });
+
+      ctx.restore();
+    },
+  };
+
+  /* ══════════════════════════════════════════════════════
      CHART DATA PREP (temperature + weather codes)
   ══════════════════════════════════════════════════════ */
   function prepTempData(allData, range) {
@@ -683,7 +727,10 @@
       return out;
     });
 
-    return { labels, temps, codes, rains };
+    const nightArr = [];
+    for (let i = start; i < end; i += step) nightArr.push(isNightAt(src[i]));
+
+    return { labels, temps, codes, rains, nightArr };
   }
 
   /* ══════════════════════════════════════════════════════
@@ -696,7 +743,7 @@
     const start = startIndex(src);
     const end   = Math.min(start + range * 24, src.length);
 
-    const labels = [], winds = [], dirs = [];
+    const labels = [], winds = [], dirs = [], nightArr = [];
     for (let i = start; i < end; i += step) {
       const d = new Date(src[i]);
       labels.push(range === 1
@@ -704,9 +751,10 @@
         : `${DN[d.getDay()]} ${String(d.getHours()).padStart(2,'0')}h`);
       winds.push(Math.round(gr.hourly.wind_speed_10m[i]));
       dirs.push(gr.hourly.wind_direction_10m[i]);
+      nightArr.push(isNightAt(src[i]));
     }
 
-    return { labels, winds, dirs };
+    return { labels, winds, dirs, nightArr };
   }
 
   /* ══════════════════════════════════════════════════════
@@ -799,7 +847,7 @@
      TEMP CHART — init once
   ══════════════════════════════════════════════════════ */
   function initTempChart(allData, range) {
-    const { labels, temps, codes, rains } = prepTempData(allData, range);
+    const { labels, temps, codes, rains, nightArr } = prepTempData(allData, range);
     const ctx = document.getElementById('temp-chart').getContext('2d');
 
     const grads = allData.map((_, i) => {
@@ -836,13 +884,14 @@
         animation: { duration: 350 },
         layout: { padding: { top: 24 } },  // room for symbols above lines
       },
-      plugins: [weatherSymbolPlugin],
+      plugins: [dayNightPlugin, weatherSymbolPlugin],
     });
+    tempChart._isNight  = nightArr;
     tempChart._symEvery = range === 1 ? 3 : 4;
   }
 
   function updateTempData(allData, range, animate) {
-    const { labels, temps, codes, rains } = prepTempData(allData, range);
+    const { labels, temps, codes, rains, nightArr } = prepTempData(allData, range);
     tempChart.data.labels = labels;
     tempChart.data.datasets[0].data                 = rains[0];
     tempChart.data.datasets[0].pointRadius          = rains[0].map(v => v > 0 ? 4 : 0);
@@ -854,6 +903,7 @@
     tempChart.data.datasets[2].codes = codes[0];
     tempChart.data.datasets[3].data  = temps[1];
     tempChart.data.datasets[3].codes = codes[1];
+    tempChart._isNight  = nightArr;
     tempChart._symEvery = range === 1 ? 3 : 4;
     tempChart.update(animate ? undefined : 'none');
   }
@@ -903,7 +953,7 @@
      WIND CHART — init once, Gronenberg only
   ══════════════════════════════════════════════════════ */
   function initWindChart(allData, range) {
-    const { labels, winds, dirs } = prepWindData(allData, range);
+    const { labels, winds, dirs, nightArr } = prepWindData(allData, range);
     const ctx = document.getElementById('wind-chart').getContext('2d');
 
     windChart = new Chart(ctx, {
@@ -942,17 +992,19 @@
         animation:{ duration:350 },
         layout:{ padding:{ top: 18 } },       // room for arrows above bars
       },
-      plugins: [windZonesPlugin, windArrowPlugin],
+      plugins: [dayNightPlugin, windZonesPlugin, windArrowPlugin],
     });
+    windChart._isNight = nightArr;
   }
 
   function updateWindData(allData, range, animate) {
-    const { labels, winds, dirs } = prepWindData(allData, range);
+    const { labels, winds, dirs, nightArr } = prepWindData(allData, range);
     windChart.data.labels = labels;
     windChart.data.datasets[0].data            = winds;
     windChart.data.datasets[0].dirs            = dirs;
     windChart.data.datasets[0].backgroundColor = winds.map(windFill);
     windChart.data.datasets[0].borderColor     = winds.map(windBorder);
+    windChart._isNight = nightArr;
     windChart.update(animate ? undefined : 'none');
   }
 
@@ -967,7 +1019,7 @@
     const start  = startIndex(src);
     const end    = Math.min(start + range * 24, src.length);
 
-    const labels = [], values = [], waveVals = [];
+    const labels = [], values = [], waveVals = [], nightArr = [];
     for (let i = start; i < end; i += step) {
       const d = new Date(src[i]);
       labels.push(range === 1
@@ -975,8 +1027,9 @@
         : `${DN[d.getDay()]} ${String(d.getHours()).padStart(2,'0')}h`);
       values.push(temps[i]  != null ? Math.round(temps[i]  * 10) / 10 : null);
       waveVals.push(waves[i] != null ? Math.round(waves[i] * 100) / 100 : null);
+      nightArr.push(isNightAt(src[i]));
     }
-    return { labels, values, waveVals };
+    return { labels, values, waveVals, nightArr };
   }
 
   // Wassertemperatur-Farbe (Linie, per Segment)
@@ -1010,7 +1063,7 @@
   }
 
   function initSeaChart(marine, range) {
-    const { labels, values, waveVals } = prepSeaData(marine, range);
+    const { labels, values, waveVals, nightArr } = prepSeaData(marine, range);
     const ctx = document.getElementById('sea-chart').getContext('2d');
 
     seaChart = new Chart(ctx, {
@@ -1071,18 +1124,21 @@
         },
         animation: { duration: 350 },
       },
+      plugins: [dayNightPlugin],
     });
 
+    seaChart._isNight = nightArr;
     const txt = seaHeaderText(values, waveVals);
     if (txt) document.getElementById('sea-current').textContent = txt;
   }
 
   function updateSeaData(marine, range, animate) {
-    const { labels, values, waveVals } = prepSeaData(marine, range);
+    const { labels, values, waveVals, nightArr } = prepSeaData(marine, range);
     seaChart.data.labels = labels;
     seaChart.data.datasets[0].data            = waveVals;
     seaChart.data.datasets[0].backgroundColor = waveVals.map(waveColor);
     seaChart.data.datasets[1].data            = values;
+    seaChart._isNight = nightArr;
     seaChart.update(animate ? undefined : 'none');
     const txt = seaHeaderText(values, waveVals);
     if (txt) document.getElementById('sea-current').textContent = txt;
