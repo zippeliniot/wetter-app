@@ -6,6 +6,7 @@
   <title>Wetterbericht – Hamburg & Gronenberg</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛅</text></svg>">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -495,7 +496,7 @@
                 'precipitation','uv_index'].join(','),
       hourly:  ['temperature_2m','precipitation','wind_speed_10m','wind_direction_10m','weather_code'].join(','),
       daily:   ['weather_code','temperature_2m_max','temperature_2m_min',
-                'precipitation_sum','sunrise','sunset','moonrise','moonset'].join(','),
+                'precipitation_sum','sunrise','sunset'].join(','),
       timezone: 'Europe/Berlin',
       forecast_days: 7,
     });
@@ -563,6 +564,10 @@
     return t || '–';
   }
 
+  function fmtHHMM(date) {
+    return String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
+  }
+
   function updateCards(allData) {
     allData.forEach((data, i) => {
       const d = data.daily;
@@ -574,13 +579,16 @@
       });
     });
 
-    // Sonnen- & Mondzeiten aus Hamburg (allData[0])
-    const d0 = allData[0].daily;
-    d0.time.forEach((_, j) => {
+    // Sonnen- & Mondzeiten
+    const d0  = allData[0].daily;
+    const lat = CITIES[1].lat, lon = CITIES[1].lon; // Gronenberg
+    d0.time.forEach((dateStr, j) => {
       set(`fc-sr-${j}`, fmtTime(d0.sunrise?.[j]));
       set(`fc-ss-${j}`, fmtTime(d0.sunset?.[j]));
-      set(`fc-mr-${j}`, fmtTime(d0.moonrise?.[j]));
-      set(`fc-ms-${j}`, fmtTime(d0.moonset?.[j]));
+      // Mondzeiten per SunCalc
+      const mt = SunCalc.getMoonTimes(new Date(dateStr + 'T12:00:00'), lat, lon);
+      set(`fc-mr-${j}`, mt.rise ? fmtHHMM(mt.rise) : '–');
+      set(`fc-ms-${j}`, mt.set  ? fmtHHMM(mt.set)  : '–');
     });
   }
 
