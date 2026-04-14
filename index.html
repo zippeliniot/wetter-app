@@ -897,12 +897,11 @@
     const showHH = currentLocation === 'hamburg'    || currentLocation === 'all';
     const showGR = currentLocation === 'gronenberg' || currentLocation === 'all';
 
-    // Temp chart dataset visibility
+    // Temp chart dataset visibility (Chart.js 4.x: meta.hidden)
     if (tempChart) {
-      tempChart.data.datasets[0].hidden = !showHH;  // HH Regen
-      tempChart.data.datasets[1].hidden = !showGR;  // GR Regen
-      tempChart.data.datasets[2].hidden = !showHH;  // HH Temp
-      tempChart.data.datasets[3].hidden = !showGR;  // GR Temp
+      [[0, !showHH],[1, !showGR],[2, !showHH],[3, !showGR]].forEach(([i, hide]) => {
+        tempChart.getDatasetMeta(i).hidden = hide;
+      });
       tempChart.update('none');
     }
 
