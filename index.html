@@ -497,7 +497,7 @@
   const _locValid = ['hamburg','gronenberg','all'];
   let currentLocation = (_locParam && _locValid.includes(_locParam.toLowerCase()))
     ? _locParam.toLowerCase()
-    : (localStorage.getItem('wetter-loc') || 'all');
+    : (localStorage.getItem('wetter-loc') || 'gronenberg');
   let cachedData      = null;
   let marineCache     = null;
   let tempChart       = null;
