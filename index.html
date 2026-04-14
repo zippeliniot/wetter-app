@@ -519,7 +519,7 @@
   async function fetchMarine() {
     const p = new URLSearchParams({
       latitude: 54.02334, longitude: 10.77672,
-      hourly:   'sea_surface_temperature',
+      hourly:   ['sea_surface_temperature','wave_height'].join(','),
       timezone: 'Europe/Berlin',
       forecast_days: 7,
     });
@@ -951,74 +951,104 @@
      OSTSEE WASSERTEMPERATUR
   ══════════════════════════════════════════════════════ */
   function prepSeaData(marine, range) {
-    const step  = range === 1 ? 1 : 2;
-    const src   = marine.hourly.time;
-    const temps = marine.hourly.sea_surface_temperature;
-    const start = startIndex(src);
-    const end   = Math.min(start + range * 24, src.length);
+    const step   = range === 1 ? 1 : 2;
+    const src    = marine.hourly.time;
+    const temps  = marine.hourly.sea_surface_temperature;
+    const waves  = marine.hourly.wave_height;
+    const start  = startIndex(src);
+    const end    = Math.min(start + range * 24, src.length);
 
-    const labels = [], values = [];
+    const labels = [], values = [], waveVals = [];
     for (let i = start; i < end; i += step) {
       const d = new Date(src[i]);
       labels.push(range === 1
         ? `${String(d.getHours()).padStart(2,'0')}:00`
         : `${DN[d.getDay()]} ${String(d.getHours()).padStart(2,'0')}h`);
-      values.push(temps[i] != null ? Math.round(temps[i] * 10) / 10 : null);
+      values.push(temps[i]  != null ? Math.round(temps[i]  * 10) / 10 : null);
+      waveVals.push(waves[i] != null ? Math.round(waves[i] * 100) / 100 : null);
     }
-    return { labels, values };
+    return { labels, values, waveVals };
   }
 
   function initSeaChart(marine, range) {
-    const { labels, values } = prepSeaData(marine, range);
+    const { labels, values, waveVals } = prepSeaData(marine, range);
     const ctx = document.getElementById('sea-chart').getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 0, 120);
-    grad.addColorStop(0, 'rgba(0,200,220,0.30)');
+    grad.addColorStop(0, 'rgba(0,200,220,0.28)');
     grad.addColorStop(1, 'rgba(0,200,220,0)');
 
     seaChart = new Chart(ctx, {
-      type: 'line',
+      type: 'bar',
       data: {
         labels,
-        datasets: [{
-          label: 'Wassertemperatur',
-          data: values,
-          borderColor: '#00C8DC',
-          backgroundColor: grad,
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          tension: 0.35,
-          fill: true,
-          spanGaps: true,
-        }],
+        datasets: [
+          // Wellenhöhe — Balken, rechte Achse
+          {
+            type: 'bar',
+            label: 'Wellenhöhe',
+            data: waveVals,
+            backgroundColor: 'rgba(100,180,255,0.40)',
+            borderColor:     'rgba(100,180,255,0.75)',
+            borderWidth: 1,
+            borderRadius: 2,
+            yAxisID: 'yWave',
+            order: 2,
+            spanGaps: true,
+          },
+          // Wassertemperatur — Linie, linke Achse
+          {
+            type: 'line',
+            label: 'Wassertemperatur',
+            data: values,
+            borderColor: '#00C8DC',
+            backgroundColor: grad,
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            tension: 0.35,
+            fill: true,
+            yAxisID: 'yTemp',
+            order: 1,
+            spanGaps: true,
+          },
+        ],
       },
       options: {
         responsive: true, maintainAspectRatio: true,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: c => ` ${c.parsed.y} °C` }},
+          tooltip: { callbacks: {
+            label: c => c.datasetIndex === 0
+              ? ` Wellen: ${c.parsed.y} m`
+              : ` Wasser: ${c.parsed.y} °C`,
+          }},
         },
         scales: {
-          x: { ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
-          y: { ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          x:     { ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          yTemp: { position:'left',  ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          yWave: { position:'right', beginAtZero:true, ticks:{ color:'rgba(100,180,255,0.85)', font:{size:11}, callback: v => v+'m' }, grid:{ drawOnChartArea:false }},
         },
         animation: { duration: 350 },
       },
     });
 
-    // Aktuellen Wert im Kartenkopf
-    const cur = values.find(v => v != null);
-    if (cur != null) document.getElementById('sea-current').textContent = cur + ' °C';
+    const cur  = values.find(v => v != null);
+    const wave = waveVals.find(v => v != null);
+    const info = [cur != null ? cur+' °C' : null, wave != null ? '〰 '+wave+' m' : null].filter(Boolean).join('  ');
+    if (info) document.getElementById('sea-current').textContent = info;
   }
 
   function updateSeaData(marine, range, animate) {
-    const { labels, values } = prepSeaData(marine, range);
+    const { labels, values, waveVals } = prepSeaData(marine, range);
     seaChart.data.labels = labels;
-    seaChart.data.datasets[0].data = values;
+    seaChart.data.datasets[0].data = waveVals;
+    seaChart.data.datasets[1].data = values;
     seaChart.update(animate ? undefined : 'none');
-    const cur = values.find(v => v != null);
-    if (cur != null) document.getElementById('sea-current').textContent = cur + ' °C';
+    const cur  = values.find(v => v != null);
+    const wave = waveVals.find(v => v != null);
+    const info = [cur != null ? cur+' °C' : null, wave != null ? '〰 '+wave+' m' : null].filter(Boolean).join('  ');
+    if (info) document.getElementById('sea-current').textContent = info;
   }
 
   /* ══════════════════════════════════════════════════════
