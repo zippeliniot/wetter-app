@@ -384,10 +384,10 @@
     <div class="chart-head">
       <span class="card-title" style="margin-bottom:0;">Temperatur &amp; Niederschlag</span>
       <div class="chart-legend">
-        <div class="cl-item"><div class="cl-line" style="background:#FFB830;"></div><span style="color:#FFB830;">HH Temp.</span></div>
-        <div class="cl-item"><div class="cl-line" style="background:#4DD9FF;"></div><span style="color:#4DD9FF;">GR Temp.</span></div>
-        <div class="cl-item"><div class="cl-dash" style="border-color:#FFB830;"></div>HH Regen</div>
-        <div class="cl-item"><div class="cl-dash" style="border-color:#4DD9FF;"></div>GR Regen</div>
+        <div class="cl-item" id="leg-hh-temp"><div class="cl-line" style="background:#FFB830;"></div><span style="color:#FFB830;">HH Temp.</span></div>
+        <div class="cl-item" id="leg-gr-temp"><div class="cl-line" style="background:#4DD9FF;"></div><span style="color:#4DD9FF;">GR Temp.</span></div>
+        <div class="cl-item" id="leg-hh-rain"><div class="cl-dash" style="border-color:#FFB830;"></div>HH Regen</div>
+        <div class="cl-item" id="leg-gr-rain"><div class="cl-dash" style="border-color:#4DD9FF;"></div>GR Regen</div>
       </div>
     </div>
     <canvas id="temp-chart" height="160"></canvas>
@@ -1136,6 +1136,12 @@
       el.style.display = showHH ? '' : 'none');
     document.querySelectorAll('.fc-row-1').forEach(el =>
       el.style.display = showGR ? '' : 'none');
+
+    // Legende Temperaturkarte
+    const d = v => v ? '' : 'none';
+    const leg = id => { const el = document.getElementById(id); if (el) el.style.display = d(id.includes('hh') ? showHH : showGR); };
+    ['leg-hh-temp','leg-hh-rain'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = d(showHH); });
+    ['leg-gr-temp','leg-gr-rain'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = d(showGR); });
   }
 
   /* ── GPS Standort ───────────────────────────────────── */
