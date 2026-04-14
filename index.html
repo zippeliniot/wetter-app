@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wetterbericht – Hamburg & Gronenberg</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(160deg, #0f2540 0%, #1a4a7a 55%, #2d7ab5 100%);
+      color: #fff;
+      padding: 16px 12px 36px;
+    }
+
+    /* ── Wrapper ─────────────────────────────────────────── */
+    .page { max-width: 760px; margin: 0 auto; }
+
+    /* ── Header bar (title left, toggle right) ──────────── */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 300;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin: 0;
+    }
+
+    /* ── Shared card style ───────────────────────────────── */
+    .card {
+      background: rgba(255,255,255,0.09);
+      backdrop-filter: blur(14px);
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.14);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+
+    .card-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      opacity: 0.85;
+      margin-bottom: 10px;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       COMPARE TABLE  (city cols as thead, metrics as tbody)
+    ══════════════════════════════════════════════════════ */
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    /* City column headers */
+    .compare-table thead td { padding: 0; }
+
+    .cth {
+      text-align: center;
+      padding: 8px 6px 10px;
+      border-radius: 10px;
+    }
+
+    .cth.c0 { background: rgba(255,184,48,0.11); border: 1px solid rgba(255,184,48,0.26); padding-right: 8px; }
+    .cth.c1 { background: rgba(77,217,255,0.11);  border: 1px solid rgba(77,217,255,0.26);  padding-left:  8px; }
+
+    .cth-icon { font-size: 2.4rem; line-height: 1; margin-bottom: 4px; }
+
+    /* temp + feels-like on same line */
+    .cth-temp-row { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin: 2px 0 4px; }
+    .cth-temp { font-size: 2.1rem; font-weight: 700; line-height: 1; }
+    .cth-temp sup { font-size: 0.85rem; font-weight: 300; vertical-align: super; }
+    .cth-feel { font-size: 0.82rem; opacity: 0.72; white-space: nowrap; }
+
+    .cth-name    { font-size: 0.90rem; font-weight: 700; }
+    .cth-name.c0 { color: #FFB830; }
+    .cth-name.c1 { color: #4DD9FF; }
+    .cth-desc    { font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
+
+    /* ══════════════════════════════════════════════════════
+       7-DAY FORECAST TABLE  (both cities in one block)
+    ══════════════════════════════════════════════════════ */
+
+    .fc-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .fc-table td {
+      text-align: center;
+      padding: 5px 3px;
+      vertical-align: middle;
+      font-size: 0.82rem;
+    }
+
+    /* day-header row */
+    .fc-table .fc-dh td {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      opacity: 0.85;
+      padding-bottom: 6px;
+    }
+
+    /* city label cell */
+    .fc-city-lbl {
+      font-size: 0.76rem !important;
+      font-weight: 700;
+      padding-right: 8px !important;
+      white-space: nowrap;
+      text-align: left !important;
+    }
+
+    .fc-city-lbl span {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    /* icon cell */
+    .fc-icon { font-size: 1.4rem; }
+
+    /* max/min temps */
+    .fc-max { font-weight: 700; font-size: 0.82rem; }
+    .fc-min { opacity: 0.78; font-size: 0.74rem !important; }
+
+    /* separator between city rows */
+    .fc-sep td {
+      height: 5px;
+      background: rgba(255,255,255,0.04);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CHART CARD
+    ══════════════════════════════════════════════════════ */
+
+    .chart-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+    }
+
+    .cl-item { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; opacity: 0.95; }
+    .cl-line  { width: 16px; height: 2px; border-radius: 2px; }
+    .cl-bar   { width: 11px; height: 11px; border-radius: 2px; opacity: 0.90; }
+    .cl-swatch{ width: 11px; height: 11px; border-radius: 2px; }
+
+    .chart-card canvas { display: block; width: 100% !important; }
+
+    /* wind threshold legend */
+    .wind-thr {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+    }
+
+    .wt-item { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; opacity: 0.95; }
+    .wt-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Range toggle ─────────────────────────────────────── */
+    .range-toggle {
+      display: flex;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 50px;
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .range-btn {
+      padding: 6px 22px;
+      border-radius: 50px;
+      border: none;
+      background: transparent;
+      color: rgba(255,255,255,0.65);
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+    }
+
+    .range-btn.active { background: rgba(255,255,255,0.22); color: #fff; }
+
+    /* ── Controls ─────────────────────────────────────────── */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .refresh-btn, .pause-btn {
+      background: rgba(255,255,255,0.13);
+      border: 1px solid rgba(255,255,255,0.28);
+      color: #fff;
+      padding: 8px 22px;
+      border-radius: 50px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: background 0.18s;
+    }
+
+    .refresh-btn:hover, .pause-btn:hover { background: rgba(255,255,255,0.22); }
+
+    .countdown-ring { position: relative; width: 30px; height: 30px; flex-shrink: 0; }
+    .countdown-ring svg { transform: rotate(-90deg); }
+    .countdown-ring .track    { fill: none; stroke: rgba(255,255,255,0.10); stroke-width: 3; }
+    .countdown-ring .progress { fill: none; stroke: rgba(120,210,255,0.85); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+    .countdown-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 600; }
+
+    .updated { text-align: center; margin-top: 10px; font-size: 0.80rem; opacity: 0.70; }
+
+    .status-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+      margin-right: 4px;
+      vertical-align: middle;
+      transition: background 0.3s;
+    }
+
+    .status-dot.loading { background: #fbbf24; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header-bar">
+    <h1>Wetter</h1>
+    <div class="range-toggle">
+      <button class="range-btn active" id="btn1" onclick="setRange(1)">1 Tag</button>
+      <button class="range-btn"        id="btn3" onclick="setRange(3)">3 Tage</button>
+    </div>
+  </div>
+
+  <!-- ── Temp + Rain chart ────────────────────────────── -->
+  <div class="card">
+    <div class="chart-head">
+      <span class="card-title" style="margin-bottom:0;">Temperatur &amp; Niederschlag</span>
+      <div class="chart-legend">
+        <div class="cl-item"><div class="cl-line" style="background:#FFB830;"></div>HH Temp.</div>
+        <div class="cl-item"><div class="cl-line" style="background:#4DD9FF;"></div>GR Temp.</div>
+        <div class="cl-item"><div class="cl-bar"  style="background:#FFB830;"></div>HH Regen</div>
+        <div class="cl-item"><div class="cl-bar"  style="background:#4DD9FF;"></div>GR Regen</div>
+      </div>
+    </div>
+    <canvas id="combo-chart" height="160"></canvas>
+  </div>
+
+  <!-- ── Wind chart (Gronenberg only) ─────────────────── -->
+  <div class="card">
+    <div class="chart-head">
+      <span class="card-title" style="margin-bottom:0;">Wind · Gronenberg km/h</span>
+      <div class="wind-thr">
+        <div class="wt-item"><div class="wt-dot" style="background:#4ade80;"></div>≤ 15</div>
+        <div class="wt-item"><div class="wt-dot" style="background:#facc15;"></div>≤ 25</div>
+        <div class="wt-item"><div class="wt-dot" style="background:#fb923c;"></div>≤ 49</div>
+        <div class="wt-item"><div class="wt-dot" style="background:#ef4444;"></div>≥ 50</div>
+      </div>
+    </div>
+    <canvas id="wind-chart" height="120"></canvas>
+  </div>
+
+  <!-- ── 7-day forecast ───────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">7-Tage-Vorschau</div>
+    <table class="fc-table" id="fc-table"></table>
+  </div>
+
+  <!-- ── Controls ─────────────────────────────────────── -->
+  <div class="controls">
+    <button class="refresh-btn" onclick="manualRefresh()">Aktualisieren</button>
+    <div class="countdown-ring">
+      <svg width="30" height="30" viewBox="0 0 30 30">
+        <circle class="track"    cx="15" cy="15" r="12"/>
+        <circle class="progress" cx="15" cy="15" r="12"
+          id="ring-progress" stroke-dasharray="75.40" stroke-dashoffset="0"/>
+      </svg>
+      <div class="countdown-num" id="countdown-num">15</div>
+    </div>
+    <button class="pause-btn" id="pause-btn" onclick="togglePause()">Pause</button>
+  </div>
+
+  <p class="updated">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="updated-text">Wird geladen …</span>
+  </p>
+
+</div><!-- .page -->
+
+<script>
+  /* ══════════════════════════════════════════════════════
+     CONFIG
+  ══════════════════════════════════════════════════════ */
+  const CITIES = [
+    { name: 'Hamburg',    sub: 'Hansestadt',                 lat: 53.5753, lon: 10.0153 },
+    { name: 'Gronenberg', sub: '23684 · Schleswig-Holstein', lat: 53.9450, lon: 10.6800 },
+  ];
+
+  const COL = [
+    { line: '#FFB830', fill: 'rgba(255,184,48,0.36)',  bar: 'rgba(255,184,48,0.52)', barB: 'rgba(255,184,48,0.78)' },
+    { line: '#4DD9FF', fill: 'rgba(77,217,255,0.28)',  bar: 'rgba(77,217,255,0.48)', barB: 'rgba(77,217,255,0.72)' },
+  ];
+
+  const WMO = {
+    0:['Klarer Himmel','☀️'],    1:['Überwiegend klar','🌤️'],
+    2:['Teilweise bewölkt','⛅'], 3:['Bedeckt','☁️'],
+    45:['Nebel','🌫️'],           48:['Raureif-Nebel','🌫️'],
+    51:['Leichter Niesel','🌦️'], 53:['Nieselregen','🌦️'],
+    55:['Starker Niesel','🌧️'],  61:['Leichter Regen','🌧️'],
+    63:['Regen','🌧️'],           65:['Starker Regen','🌧️'],
+    71:['Leicht. Schnee','🌨️'],  73:['Schneefall','❄️'],
+    75:['Starker Schnee','❄️'],  77:['Schneekörner','🌨️'],
+    80:['Leichte Schauer','🌦️'], 81:['Schauer','🌧️'],
+    82:['Starke Schauer','⛈️'],  85:['Schneeschauer','🌨️'],
+    86:['Starke Schnee-S.','❄️'],95:['Gewitter','⛈️'],
+    96:['Gewitter+Hagel','⛈️'],  99:['Schw. Gewitter','⛈️'],
+  };
+
+  function wmo(c)    { return WMO[c] ?? ['Unbekannt','🌡️']; }
+  function wdir(deg) { return ['N','NO','O','SO','S','SW','W','NW'][Math.round(deg/45)%8]; }
+  const DN = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+  /* ══════════════════════════════════════════════════════
+     STATE
+  ══════════════════════════════════════════════════════ */
+  let currentRange = 1;
+  let cachedData   = null;
+  let comboChart   = null;
+  let windChart    = null;
+  let shellBuilt   = false;
+
+  /* ══════════════════════════════════════════════════════
+     API
+  ══════════════════════════════════════════════════════ */
+  async function fetchCity(city) {
+    const p = new URLSearchParams({
+      latitude: city.lat, longitude: city.lon,
+      current: ['temperature_2m','relative_humidity_2m','apparent_temperature',
+                'weather_code','wind_speed_10m','wind_direction_10m',
+                'precipitation','uv_index'].join(','),
+      hourly:  ['temperature_2m','precipitation','wind_speed_10m','wind_direction_10m'].join(','),
+      daily:   ['weather_code','temperature_2m_max','temperature_2m_min',
+                'precipitation_sum'].join(','),
+      timezone: 'Europe/Berlin',
+      forecast_days: 7,
+    });
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?${p}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }
+
+  /* ══════════════════════════════════════════════════════
+     BUILD SHELL (once)
+  ══════════════════════════════════════════════════════ */
+  function buildShell(allData) {
+    /* ── Forecast table ── */
+    const days = allData[0].daily.time;
+    const dayLabels = days.map((t, i) => i === 0 ? 'Heute' : DN[new Date(t).getDay()]);
+
+    document.getElementById('fc-table').innerHTML = `
+      <tr class="fc-dh">
+        <td></td>
+        ${dayLabels.map(d => `<td>${d}</td>`).join('')}
+      </tr>
+      ${CITIES.map((c, ci) => `
+        <tr>
+          <td class="fc-city-lbl">
+            <span style="background:${ci===0?'#FFB830':'#4DD9FF'};"></span>
+            ${ci===0?'HH':'GR'}
+          </td>
+          ${days.map((_,di) => `
+            <td>
+              <div class="fc-icon" id="fc-${ci}-${di}-icon"></div>
+              <div class="fc-max"  id="fc-${ci}-${di}-max"></div>
+              <div class="fc-min"  id="fc-${ci}-${di}-min"></div>
+            </td>`).join('')}
+        </tr>
+        ${ci === 0 ? '<tr class="fc-sep"><td colspan="8"></td></tr>' : ''}`
+      ).join('')}`;
+
+    shellBuilt = true;
+  }
+
+  /* ══════════════════════════════════════════════════════
+     UPDATE CARD VALUES (in-place, no DOM rebuild)
+  ══════════════════════════════════════════════════════ */
+  function updateCards(allData) {
+    allData.forEach((data, i) => {
+      const c = data.current, d = data.daily;
+
+      d.time.forEach((_, j) => {
+        const [, fi] = wmo(d.weather_code[j]);
+        set(`fc-${i}-${j}-icon`, fi);
+        set(`fc-${i}-${j}-max`,  Math.round(d.temperature_2m_max[j]) + '°');
+        set(`fc-${i}-${j}-min`,  Math.round(d.temperature_2m_min[j]) + '°');
+      });
+    });
+  }
+
+  function set(id, val) {
+    const el = document.getElementById(id);
+    if (el && el.textContent !== String(val)) el.textContent = val;
+  }
+
+  /* ══════════════════════════════════════════════════════
+     FIND START INDEX — first entry >= current hour
+  ══════════════════════════════════════════════════════ */
+  function startIndex(times) {
+    const now = new Date();
+    now.setMinutes(0, 0, 0); // floor to current hour
+    for (let i = 0; i < times.length; i++) {
+      if (new Date(times[i]) >= now) return i;
+    }
+    return 0;
+  }
+
+  /* ══════════════════════════════════════════════════════
+     CHART DATA PREP (temp + rain)
+  ══════════════════════════════════════════════════════ */
+  function prepComboData(allData, range) {
+    const step  = range === 1 ? 1 : 2;
+    const src   = allData[0].hourly.time;
+    const start = startIndex(src);
+    const end   = Math.min(start + range * 24, src.length);
+
+    const labels = [];
+    for (let i = start; i < end; i += step) {
+      const d = new Date(src[i]);
+      labels.push(range === 1
+        ? `${String(d.getHours()).padStart(2,'0')}:00`
+        : `${DN[d.getDay()]} ${String(d.getHours()).padStart(2,'0')}h`);
+    }
+
+    const temps = allData.map(d => {
+      const out = [];
+      for (let i = start; i < end; i += step)
+        out.push(d.hourly.temperature_2m[i]);
+      return out;
+    });
+
+    const rains = allData.map(d => {
+      const out = [];
+      for (let i = start; i < end; i += step) {
+        let s = 0;
+        for (let j = i; j < Math.min(i + step, end, d.hourly.time.length); j++)
+          s += (d.hourly.precipitation[j] ?? 0);
+        out.push(Math.round(s * 10) / 10);
+      }
+      return out;
+    });
+
+    return { labels, temps, rains };
+  }
+
+  /* ══════════════════════════════════════════════════════
+     WIND DATA PREP (Gronenberg only)
+  ══════════════════════════════════════════════════════ */
+  function prepWindData(allData, range) {
+    const gr    = allData[1];
+    const step  = range === 1 ? 1 : 2;
+    const src   = gr.hourly.time;
+    const start = startIndex(src);
+    const end   = Math.min(start + range * 24, src.length);
+
+    const labels = [], winds = [], dirs = [];
+    for (let i = start; i < end; i += step) {
+      const d = new Date(src[i]);
+      labels.push(range === 1
+        ? `${String(d.getHours()).padStart(2,'0')}:00`
+        : `${DN[d.getDay()]} ${String(d.getHours()).padStart(2,'0')}h`);
+      winds.push(Math.round(gr.hourly.wind_speed_10m[i]));
+      dirs.push(gr.hourly.wind_direction_10m[i]);
+    }
+
+    return { labels, winds, dirs };
+  }
+
+  /* ══════════════════════════════════════════════════════
+     WIND COLOUR HELPERS
+  ══════════════════════════════════════════════════════ */
+  function windFill(v) {
+    if (v <= 15) return 'rgba(74,222,128,0.80)';
+    if (v <= 25) return 'rgba(250,204,21,0.80)';
+    if (v <  50) return 'rgba(251,146,60,0.82)';
+    return              'rgba(239,68,68,0.88)';
+  }
+  function windBorder(v) {
+    if (v <= 15) return 'rgba(74,222,128,1)';
+    if (v <= 25) return 'rgba(250,204,21,1)';
+    if (v <  50) return 'rgba(251,146,60,1)';
+    return              'rgba(239,68,68,1)';
+  }
+
+  /* ══════════════════════════════════════════════════════
+     WIND ZONES PLUGIN (background bands + dashes)
+  ══════════════════════════════════════════════════════ */
+  const windZonesPlugin = {
+    id: 'windZones',
+    beforeDatasetsDraw(chart) {
+      const { ctx, chartArea: a, scales: { y } } = chart;
+      if (!a) return;
+      const bands = [
+        { from: 0,  to: 15,    color: 'rgba(74,222,128,0.06)' },
+        { from: 15, to: 25,    color: 'rgba(250,204,21,0.07)' },
+        { from: 25, to: 50,    color: 'rgba(251,146,60,0.07)' },
+        { from: 50, to: y.max, color: 'rgba(239,68,68,0.09)'  },
+      ];
+      ctx.save();
+      bands.forEach(b => {
+        if (b.from >= y.max) return;
+        const top = y.getPixelForValue(Math.min(b.to, y.max));
+        const bot = y.getPixelForValue(b.from);
+        ctx.fillStyle = b.color;
+        ctx.fillRect(a.left, top, a.width, bot - top);
+      });
+      ctx.setLineDash([3,3]);
+      ctx.lineWidth = 1;
+      [[15,'rgba(74,222,128,0.38)'],[25,'rgba(250,204,21,0.38)'],[50,'rgba(239,68,68,0.38)']].forEach(([v,c]) => {
+        if (v > y.max) return;
+        const py = y.getPixelForValue(v);
+        ctx.strokeStyle = c;
+        ctx.beginPath(); ctx.moveTo(a.left, py); ctx.lineTo(a.right, py); ctx.stroke();
+      });
+      ctx.restore();
+    },
+  };
+
+  /* ══════════════════════════════════════════════════════
+     COMBO CHART — init once
+  ══════════════════════════════════════════════════════ */
+  function initComboChart(allData, range) {
+    const { labels, temps, rains } = prepComboData(allData, range);
+    const ctx = document.getElementById('combo-chart').getContext('2d');
+
+    const grads = allData.map((_, i) => {
+      const g = ctx.createLinearGradient(0, 0, 0, 240);
+      g.addColorStop(0, COL[i].fill); g.addColorStop(1, 'rgba(0,0,0,0)');
+      return g;
+    });
+
+    comboChart = new Chart(ctx, {
+      data: {
+        labels,
+        datasets: [
+          { type:'bar',  label:'HH Regen', data:rains[0], backgroundColor:COL[0].bar, borderColor:COL[0].barB, borderWidth:1, borderRadius:2, yAxisID:'yRain', order:3 },
+          { type:'bar',  label:'GR Regen', data:rains[1], backgroundColor:COL[1].bar, borderColor:COL[1].barB, borderWidth:1, borderRadius:2, yAxisID:'yRain', order:4 },
+          { type:'line', label:'HH Temp.', data:temps[0], borderColor:COL[0].line, backgroundColor:grads[0], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:1 },
+          { type:'line', label:'GR Temp.', data:temps[1], borderColor:COL[1].line, backgroundColor:grads[1], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:2 },
+        ],
+      },
+      options: {
+        responsive:true, maintainAspectRatio:true,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ callbacks:{ label: c => ` ${c.dataset.label}: ${c.parsed.y}${c.datasetIndex < 2 ? ' mm' : '°C'}` }},
+        },
+        scales:{
+          x:{ ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          yTemp:{ position:'left',  ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          yRain:{ position:'right', beginAtZero:true, ticks:{ color:'rgba(140,210,255,0.90)', font:{size:11}, callback: v => v+'mm' }, grid:{ drawOnChartArea:false }},
+        },
+        animation:{ duration:350 },
+      },
+    });
+  }
+
+  function updateComboData(allData, range, animate) {
+    const { labels, temps, rains } = prepComboData(allData, range);
+    comboChart.data.labels = labels;
+    comboChart.data.datasets[0].data = rains[0];
+    comboChart.data.datasets[1].data = rains[1];
+    comboChart.data.datasets[2].data = temps[0];
+    comboChart.data.datasets[3].data = temps[1];
+    comboChart.update(animate ? undefined : 'none');
+  }
+
+  /* ══════════════════════════════════════════════════════
+     WIND ARROW PLUGIN
+  ══════════════════════════════════════════════════════ */
+  const windArrowPlugin = {
+    id: 'windArrows',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x, y } } = chart;
+      const ds   = chart.data.datasets[0];
+      const meta = chart.getDatasetMeta(0);
+      if (!ds.dirs || !meta.data.length) return;
+
+      // only draw if bars are wide enough
+      const barW = meta.data[0]?.width ?? 0;
+      if (barW < 6) return;
+
+      ctx.save();
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font         = `bold ${Math.max(9, Math.min(13, barW * 0.65))}px sans-serif`;
+
+      meta.data.forEach((bar, i) => {
+        const spd = ds.data[i];
+        const dir = ds.dirs[i];
+        if (spd == null || dir == null) return;
+
+        const bx = bar.x;
+        const by = y.getPixelForValue(spd) - 9;
+
+        ctx.save();
+        ctx.translate(bx, by);
+        // dir = meteorological FROM-direction; rotate arrow so it points where wind blows TO
+        ctx.rotate(((dir + 180) % 360) * Math.PI / 180);
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.fillText('↑', 0, 0);
+        ctx.restore();
+      });
+
+      ctx.restore();
+    },
+  };
+
+  /* ══════════════════════════════════════════════════════
+     WIND CHART — init once, Gronenberg only
+  ══════════════════════════════════════════════════════ */
+  function initWindChart(allData, range) {
+    const { labels, winds, dirs } = prepWindData(allData, range);
+    const ctx = document.getElementById('wind-chart').getContext('2d');
+
+    windChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Gronenberg',
+          data:  winds,
+          dirs,                              // custom property for arrow plugin
+          backgroundColor: winds.map(windFill),
+          borderColor:     winds.map(windBorder),
+          borderWidth: 1,
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        responsive:true, maintainAspectRatio:true,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{
+            callbacks:{
+              label: c => {
+                const dir = c.dataset.dirs?.[c.dataIndex];
+                const dirStr = dir != null ? ` · ${wdir(dir)}` : '';
+                return ` ${c.parsed.y} km/h${dirStr}`;
+              },
+            },
+          },
+        },
+        scales:{
+          x:{ ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          y:{ beginAtZero:true, ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+' km/h' }, grid:{ color:'rgba(255,255,255,0.08)' }},
+        },
+        animation:{ duration:350 },
+        layout:{ padding:{ top: 18 } },       // room for arrows above bars
+      },
+      plugins: [windZonesPlugin, windArrowPlugin],
+    });
+  }
+
+  function updateWindData(allData, range, animate) {
+    const { labels, winds, dirs } = prepWindData(allData, range);
+    windChart.data.labels = labels;
+    windChart.data.datasets[0].data            = winds;
+    windChart.data.datasets[0].dirs            = dirs;
+    windChart.data.datasets[0].backgroundColor = winds.map(windFill);
+    windChart.data.datasets[0].borderColor     = winds.map(windBorder);
+    windChart.update(animate ? undefined : 'none');
+  }
+
+  /* ══════════════════════════════════════════════════════
+     RANGE TOGGLE
+  ══════════════════════════════════════════════════════ */
+  function setRange(days) {
+    if (days === currentRange) return;
+    currentRange = days;
+    document.getElementById('btn1').classList.toggle('active', days === 1);
+    document.getElementById('btn3').classList.toggle('active', days === 3);
+    if (cachedData) {
+      updateComboData(cachedData, currentRange, true);
+      updateWindData(cachedData, currentRange, true);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════
+     LOAD
+  ══════════════════════════════════════════════════════ */
+  async function loadAll(silent = false) {
+    setStatus('loading');
+    const results = await Promise.allSettled(CITIES.map(c => fetchCity(c)));
+    if (!results.every(r => r.status === 'fulfilled')) { setStatus('error'); return; }
+
+    const allData = results.map(r => r.value);
+    cachedData = allData;
+
+    if (!shellBuilt) {
+      buildShell(allData);
+      updateCards(allData);
+      requestAnimationFrame(() => {
+        initComboChart(allData, currentRange);
+        initWindChart(allData, currentRange);
+      });
+    } else {
+      updateCards(allData);
+      updateComboData(allData, currentRange, false);
+      updateWindData(allData, currentRange, false);
+    }
+
+    setStatus('ok');
+    document.getElementById('updated-text').textContent =
+      'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE');
+  }
+
+  function setStatus(s) {
+    document.getElementById('status-dot').className =
+      'status-dot' + (s === 'loading' ? ' loading' : '');
+  }
+
+  /* ══════════════════════════════════════════════════════
+     TIMER
+  ══════════════════════════════════════════════════════ */
+  const INTERVAL = 15;
+  const CIRCUMF  = 2 * Math.PI * 12; // r=12 ≈ 75.40
+
+  let remaining = INTERVAL, paused = false;
+  const ringEl   = document.getElementById('ring-progress');
+  const numEl    = document.getElementById('countdown-num');
+  const pauseBtn = document.getElementById('pause-btn');
+
+  function setRing(s) {
+    ringEl.style.strokeDashoffset = CIRCUMF * (1 - s / INTERVAL);
+    numEl.textContent = s;
+  }
+
+  function tick() {
+    if (paused) return;
+    remaining--;
+    setRing(remaining);
+    if (remaining <= 0) { remaining = INTERVAL; setRing(remaining); loadAll(true); }
+  }
+
+  function togglePause() {
+    paused = !paused;
+    pauseBtn.textContent      = paused ? 'Weiter' : 'Pause';
+    pauseBtn.style.background = paused ? 'rgba(255,184,48,0.20)' : '';
+  }
+
+  function manualRefresh() { remaining = INTERVAL; setRing(remaining); loadAll(false); }
+
+  setRing(INTERVAL);
+  loadAll(false);
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>
