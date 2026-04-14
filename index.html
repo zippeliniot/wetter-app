@@ -847,6 +847,25 @@
         });
         ctx.restore();
       });
+
+      // Rain gear symbol above precipitation line
+      chart.data.datasets.forEach((ds, dsIdx) => {
+        if (!ds.isRain) return;
+        const meta = chart.getDatasetMeta(dsIdx);
+        if (ds.hidden || meta.hidden) return;
+        ctx.save();
+        ctx.font = '12px sans-serif';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'bottom';
+        ds.data.forEach((val, i) => {
+          if ((val ?? 0) < 0.3) return;
+          if (i % everyN !== 0) return;
+          const pt = meta.data[i];
+          if (!pt) return;
+          ctx.fillText('🌂', pt.x, pt.y - 6);
+        });
+        ctx.restore();
+      });
     },
   };
 
@@ -869,8 +888,8 @@
         labels,
         datasets: [
           // rain dotted lines (order 3+4 = behind temp lines)
-          { type:'line', label:'HH Regen', data:rains[0], borderColor:'rgba(255,184,48,0.55)', borderWidth:1.5, borderDash:[4,4], pointRadius:rains[0].map(v=>v>0?4:0), pointBackgroundColor:rains[0].map(rainDotColor), pointBorderWidth:0, tension:0.3, fill:false, yAxisID:'yRain', order:3 },
-          { type:'line', label:'GR Regen', data:rains[1], borderColor:'rgba(77,217,255,0.55)',  borderWidth:1.5, borderDash:[4,4], pointRadius:rains[1].map(v=>v>0?4:0), pointBackgroundColor:rains[1].map(rainDotColor), pointBorderWidth:0, tension:0.3, fill:false, yAxisID:'yRain', order:4 },
+          { type:'line', label:'HH Regen', data:rains[0], isRain:true, borderColor:'rgba(255,184,48,0.55)', borderWidth:1.5, borderDash:[4,4], pointRadius:rains[0].map(v=>v>0?4:0), pointBackgroundColor:rains[0].map(rainDotColor), pointBorderWidth:0, tension:0.3, fill:false, yAxisID:'yRain', order:3 },
+          { type:'line', label:'GR Regen', data:rains[1], isRain:true, borderColor:'rgba(77,217,255,0.55)',  borderWidth:1.5, borderDash:[4,4], pointRadius:rains[1].map(v=>v>0?4:0), pointBackgroundColor:rains[1].map(rainDotColor), pointBorderWidth:0, tension:0.3, fill:false, yAxisID:'yRain', order:4 },
           // temp lines (order 1+2 = in front)
           { type:'line', label:'HH Temp.', data:temps[0], codes:codes[0], borderColor:COL[0].line, backgroundColor:grads[0], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:1 },
           { type:'line', label:'GR Temp.', data:temps[1], codes:codes[1], borderColor:COL[1].line, backgroundColor:grads[1], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:2 },
