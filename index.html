@@ -642,6 +642,34 @@
   }
 
   /* ══════════════════════════════════════════════════════
+     X-ACHSE: Stundengitter (jede Stunde senkrecht)
+  ══════════════════════════════════════════════════════ */
+  function xAxisCfg(chart) {
+    return {
+      ticks: {
+        color: 'rgba(255,255,255,0.85)',
+        font: { size: 11 },
+        maxRotation: 0,
+        autoSkip: false,
+        callback: function(val) {
+          const label = this.getLabelForValue(val) ?? '';
+          const m = label.match(/(\d{2})(?::00|h)/);
+          return m && parseInt(m[1]) % 3 === 0 ? label : '';
+        },
+      },
+      grid: {
+        color: ctx => {
+          const label = ctx.chart.data.labels?.[ctx.index] ?? '';
+          const m = label.match(/(\d{2})(?::00|h)/);
+          return m && parseInt(m[1]) % 3 === 0
+            ? 'rgba(255,255,255,0.18)'   // jede 3h: deutliche Linie
+            : 'rgba(255,255,255,0.06)';  // jede Stunde: feine Linie
+        },
+      },
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════
      TAG / NACHT HINTERGRUND
   ══════════════════════════════════════════════════════ */
   function isNightAt(isoStr) {
@@ -862,7 +890,7 @@
           tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y}${c.datasetIndex < 2 ? ' mm' : '°C'}` }},
         },
         scales: {
-          x:     { ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          x: xAxisCfg(),
           yTemp: { position:'left',  ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
           yRain: { position:'right', beginAtZero:true, ticks:{ color:'rgba(140,210,255,0.90)', font:{size:11}, callback: v => v+'mm' }, grid:{ drawOnChartArea:false }},
         },
@@ -971,7 +999,7 @@
           },
         },
         scales:{
-          x:{ ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          x: xAxisCfg(),
           y:{ beginAtZero:true, ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+' km/h' }, grid:{ color:'rgba(255,255,255,0.08)' }},
         },
         animation:{ duration:350 },
@@ -1101,7 +1129,7 @@
           }},
         },
         scales: {
-          x:     { ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:12 }, grid:{ color:'rgba(255,255,255,0.08)' }},
+          x: xAxisCfg(),
           yTemp: { position:'left',  ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
           yWave: { position:'right', beginAtZero:true,
                    ticks:{ color:'rgba(140,200,255,0.85)', font:{size:11}, stepSize:0.05, maxTicksLimit:8, callback: v => Math.round(v*100)+'cm' },
