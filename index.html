@@ -137,10 +137,16 @@
     .fc-min { opacity: 0.78; font-size: 0.74rem !important; }
 
     /* separator between city rows */
-    .fc-sep td {
+    .fc-sep td, .fc-city-sep td {
       height: 5px;
       background: rgba(255,255,255,0.04);
     }
+
+    /* sun / moon info rows */
+    .fc-info-sep td { height: 8px; }
+    .fc-info-row td { padding: 2px 3px; }
+    .fc-info-lbl    { font-size: 1.05rem; text-align: left !important; padding-left: 2px !important; }
+    .fc-time        { font-size: 0.70rem; opacity: 0.80; }
 
     /* ══════════════════════════════════════════════════════
        CHART CARD
@@ -489,7 +495,7 @@
                 'precipitation','uv_index'].join(','),
       hourly:  ['temperature_2m','precipitation','wind_speed_10m','wind_direction_10m','weather_code'].join(','),
       daily:   ['weather_code','temperature_2m_max','temperature_2m_min',
-                'precipitation_sum'].join(','),
+                'precipitation_sum','sunrise','sunset','moonrise','moonset'].join(','),
       timezone: 'Europe/Berlin',
       forecast_days: 7,
     });
@@ -525,7 +531,25 @@
             </td>`).join('')}
         </tr>
         ${ci === 0 ? '<tr class="fc-city-sep fc-row-sep"><td colspan="8"></td></tr>' : ''}`
-      ).join('')}`;
+      ).join('')}
+      <tr class="fc-info-sep"><td colspan="8"></td></tr>
+      <tr class="fc-info-row">
+        <td class="fc-info-lbl">🌅</td>
+        ${days.map((_,di) => `<td class="fc-time" id="fc-sr-${di}"></td>`).join('')}
+      </tr>
+      <tr class="fc-info-row">
+        <td class="fc-info-lbl">🌇</td>
+        ${days.map((_,di) => `<td class="fc-time" id="fc-ss-${di}"></td>`).join('')}
+      </tr>
+      <tr class="fc-info-sep"><td colspan="8"></td></tr>
+      <tr class="fc-info-row">
+        <td class="fc-info-lbl">🌕</td>
+        ${days.map((_,di) => `<td class="fc-time" id="fc-mr-${di}"></td>`).join('')}
+      </tr>
+      <tr class="fc-info-row">
+        <td class="fc-info-lbl">🌑</td>
+        ${days.map((_,di) => `<td class="fc-time" id="fc-ms-${di}"></td>`).join('')}
+      </tr>`;
 
     shellBuilt = true;
   }
@@ -533,16 +557,30 @@
   /* ══════════════════════════════════════════════════════
      UPDATE CARD VALUES (in-place, no DOM rebuild)
   ══════════════════════════════════════════════════════ */
+  function fmtTime(iso) {
+    if (!iso) return '–';
+    const t = iso.includes('T') ? iso.split('T')[1].slice(0, 5) : iso.slice(-5);
+    return t || '–';
+  }
+
   function updateCards(allData) {
     allData.forEach((data, i) => {
-      const c = data.current, d = data.daily;
-
+      const d = data.daily;
       d.time.forEach((_, j) => {
         const [, fi] = wmo(d.weather_code[j]);
         set(`fc-${i}-${j}-icon`, fi);
         set(`fc-${i}-${j}-max`,  Math.round(d.temperature_2m_max[j]) + '°');
         set(`fc-${i}-${j}-min`,  Math.round(d.temperature_2m_min[j]) + '°');
       });
+    });
+
+    // Sonnen- & Mondzeiten aus Hamburg (allData[0])
+    const d0 = allData[0].daily;
+    d0.time.forEach((_, j) => {
+      set(`fc-sr-${j}`, fmtTime(d0.sunrise?.[j]));
+      set(`fc-ss-${j}`, fmtTime(d0.sunset?.[j]));
+      set(`fc-mr-${j}`, fmtTime(d0.moonrise?.[j]));
+      set(`fc-ms-${j}`, fmtTime(d0.moonset?.[j]));
     });
   }
 
