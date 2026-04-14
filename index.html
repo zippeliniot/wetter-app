@@ -656,31 +656,16 @@
       const { ctx, chartArea: a } = chart;
       if (!a || !chart._isNight?.length) return;
 
-      // ersten Dataset mit gerenderten Punkten finden
-      let meta = null;
-      for (let i = 0; i < chart.data.datasets.length; i++) {
-        const m = chart.getDatasetMeta(i);
-        if (m.data?.length) { meta = m; break; }
-      }
-      if (!meta) return;
+      const n    = chart._isNight;
+      const slot = a.width / n.length;
 
       ctx.save();
-      ctx.fillStyle = 'rgba(0, 8, 60, 0.32)';
-
-      const n = chart._isNight;
       n.forEach((night, i) => {
-        if (!night) return;
-        const pt   = meta.data[i];
-        if (!pt) return;
-        const x1 = i === 0
-          ? a.left
-          : ((meta.data[i-1]?.x ?? pt.x) + pt.x) / 2;
-        const x2 = i === n.length - 1
-          ? a.right
-          : (pt.x + (meta.data[i+1]?.x ?? pt.x)) / 2;
-        ctx.fillRect(x1, a.top, x2 - x1, a.height);
+        ctx.fillStyle = night
+          ? 'rgba(0, 5, 55, 0.38)'        // Nacht: dunkles Blau
+          : 'rgba(255, 215, 100, 0.11)';  // Tag: warmes Gelb
+        ctx.fillRect(a.left + i * slot, a.top, slot + 0.5, a.height);
       });
-
       ctx.restore();
     },
   };
