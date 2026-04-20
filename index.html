@@ -5,384 +5,114 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wetterbericht – Hamburg & Gronenberg</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛅</text></svg>">
+
+  <!-- External Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+
   <style>
+    /* Hier kopieren Sie exakt das CSS aus dem vorherigen Update hinein */
+    /* (Wichtig: Behalten Sie die .chart-wrapper und .fs-modal Styles bei) */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
-      background: linear-gradient(160deg, #0f2540 0%, #1a4a7a 55%, #2d7ab5 100%);
-      color: #fff;
-      padding: 16px 12px 36px;
-    }
-
-    /* ── Wrapper ─────────────────────────────────────────── */
+    body { font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; background: linear-gradient(160deg, #0f2540 0%, #1a4a7a 55%, #2d7ab5 100%); color: #fff; padding: 16px 12px 36px; overflow-x: hidden; }
     .page { max-width: 760px; margin: 0 auto; }
-
-    /* ── Header bar (title left, toggle right) ──────────── */
-    .header-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
-
-    h1 {
-      font-size: 1.35rem;
-      font-weight: 300;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      margin: 0;
-    }
-
-    /* ── Shared card style ───────────────────────────────── */
-    .card {
-      background: rgba(255,255,255,0.09);
-      backdrop-filter: blur(14px);
-      border-radius: 18px;
-      border: 1px solid rgba(255,255,255,0.14);
-      padding: 14px 16px;
-      margin-bottom: 10px;
-    }
-
-    .card-title {
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 1.2px;
-      opacity: 0.85;
-      margin-bottom: 10px;
-    }
-
-    /* ══════════════════════════════════════════════════════
-       COMPARE TABLE  (city cols as thead, metrics as tbody)
-    ══════════════════════════════════════════════════════ */
-
-    .compare-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    /* City column headers */
-    .compare-table thead td { padding: 0; }
-
-    .cth {
-      text-align: center;
-      padding: 8px 6px 10px;
-      border-radius: 10px;
-    }
-
-    .cth.c0 { background: rgba(255,184,48,0.11); border: 1px solid rgba(255,184,48,0.26); padding-right: 8px; }
-    .cth.c1 { background: rgba(77,217,255,0.11);  border: 1px solid rgba(77,217,255,0.26);  padding-left:  8px; }
-
-    .cth-icon { font-size: 2.4rem; line-height: 1; margin-bottom: 4px; }
-
-    /* temp + feels-like on same line */
-    .cth-temp-row { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin: 2px 0 4px; }
-    .cth-temp { font-size: 2.1rem; font-weight: 700; line-height: 1; }
-    .cth-temp sup { font-size: 0.85rem; font-weight: 300; vertical-align: super; }
-    .cth-feel { font-size: 0.82rem; opacity: 0.72; white-space: nowrap; }
-
-    .cth-name    { font-size: 0.90rem; font-weight: 700; }
-    .cth-name.c0 { color: #FFB830; }
-    .cth-name.c1 { color: #4DD9FF; }
-    .cth-desc    { font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
-
-    /* ══════════════════════════════════════════════════════
-       7-DAY FORECAST TABLE  (both cities in one block)
-    ══════════════════════════════════════════════════════ */
-
-    .fc-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .fc-table td {
-      text-align: center;
-      padding: 5px 3px;
-      vertical-align: middle;
-      font-size: 0.82rem;
-    }
-
-    /* day-header row */
-    .fc-table .fc-dh td {
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      opacity: 0.85;
-      padding-bottom: 6px;
-    }
-
-    /* city label cell */
-    .fc-city-lbl {
-      font-size: 0.76rem !important;
-      font-weight: 700;
-      padding-right: 8px !important;
-      white-space: nowrap;
-      text-align: left !important;
-    }
-
-    .fc-city-lbl span {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      margin-right: 4px;
-      vertical-align: middle;
-    }
-
-    /* icon cell */
+    .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    h1 { font-size: 1.35rem; font-weight: 300; letter-spacing: 3px; text-transform: uppercase; margin: 0; }
+    .card { background: rgba(255,255,255,0.09); backdrop-filter: blur(14px); border-radius: 18px; border: 1px solid rgba(255,255,255,0.14); padding: 10px 12px; margin-bottom: 8px; }
+    .chart-wrapper { position: relative; width: 100%; margin-top: 10px; }
+    .card-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.2px; opacity: 0.85; margin-bottom: 10px; cursor: pointer; display: inline-block; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; user-select: none; }
+    .card-title:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .fc-table { width: 100%; border-collapse: collapse; }
+    .fc-table td { text-align: center; padding: 5px 3px; vertical-align: middle; font-size: 0.82rem; }
+    .fc-table .fc-dh td { font-size: 0.75rem; text-transform: uppercase; opacity: 0.85; padding-bottom: 6px; }
+    .fc-city-lbl { font-size: 0.76rem !important; font-weight: 700; padding-right: 8px !important; white-space: nowrap; text-align: left !important; }
+    .fc-city-lbl span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
     .fc-icon { font-size: 1.4rem; }
-
-    /* max/min temps */
     .fc-max { font-weight: 700; font-size: 0.82rem; }
-    .fc-min { opacity: 0.78; font-size: 0.74rem !important; }
-
-    /* separator between city rows */
-    .fc-sep td, .fc-city-sep td {
-      height: 5px;
-      background: rgba(255,255,255,0.04);
-    }
-
-    /* sun / moon info rows */
+    .fc-min { opacity: 0.78; font-size: 0.78rem !important; }
+    .fc-sep td, .fc-city-sep td { height: 5px; background: rgba(255,255,255,0.04); }
     .fc-info-sep td { height: 8px; }
     .fc-info-row td { padding: 2px 3px; }
-    .fc-info-lbl    { font-size: 1.05rem; text-align: left !important; padding-left: 2px !important; white-space: nowrap; }
-    .fc-lbl-txt     { font-size: 0.68rem; opacity: 0.75; margin-left: 3px; vertical-align: middle; }
-    .fc-time        { font-size: 0.70rem; opacity: 0.80; }
-
-    /* ══════════════════════════════════════════════════════
-       CHART CARD
-    ══════════════════════════════════════════════════════ */
-
-    .chart-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-
-    .chart-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 12px;
-    }
-
+    .fc-info-lbl { font-size: 1.05rem; text-align: left !important; padding-left: 2px !important; white-space: nowrap; }
+    .fc-lbl-txt { font-size: 0.75rem; opacity: 0.75; margin-left: 3px; vertical-align: middle; }
+    .fc-time { font-size: 0.70rem; opacity: 0.80; }
+    .chart-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; }
     .cl-item { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; opacity: 0.95; }
-    .cl-line  { width: 16px; height: 2px; border-radius: 2px; }
-    .cl-bar   { width: 11px; height: 11px; border-radius: 2px; opacity: 0.90; }
-    .cl-swatch{ width: 11px; height: 11px; border-radius: 2px; }
-    .cl-dash  { width: 18px; height: 0; border-top: 2px dashed; opacity: 0.9; }
-
-    .chart-card canvas { display: block; width: 100% !important; }
-
-    /* wind threshold legend */
-    .wind-thr {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px 12px;
-    }
-
+    .cl-line { width: 16px; height: 2px; border-radius: 2px; }
+    .cl-dash { width: 18px; height: 0; border-top: 2px dashed; opacity: 0.9; }
+    .wind-thr { display: flex; flex-wrap: wrap; gap: 6px 12px; }
     .wt-item { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; opacity: 0.95; }
-    .wt-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
-    /* ── Range toggle ─────────────────────────────────────── */
-    .range-toggle {
-      display: flex;
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 50px;
-      padding: 3px;
-      gap: 3px;
-    }
-
-    .range-btn {
-      padding: 6px 22px;
-      border-radius: 50px;
-      border: none;
-      background: transparent;
-      color: rgba(255,255,255,0.65);
-      font-size: 0.88rem;
-      font-weight: 600;
-      letter-spacing: 1px;
-      cursor: pointer;
-      transition: background 0.18s, color 0.18s;
-    }
-
+    .wt-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .range-toggle { display: flex; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); border-radius: 50px; padding: 3px; gap: 3px; }
+    .range-btn { padding: 6px 22px; border-radius: 50px; border: none; background: transparent; color: rgba(255,255,255,0.65); font-size: 0.88rem; font-weight: 600; letter-spacing: 1px; cursor: pointer; transition: background 0.18s, color 0.18s; }
     .range-btn.active { background: rgba(255,255,255,0.22); color: #fff; }
-
-    /* ── Controls ─────────────────────────────────────────── */
-    .controls {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 14px;
-    }
-
-    .refresh-btn, .pause-btn {
-      background: rgba(255,255,255,0.13);
-      border: 1px solid rgba(255,255,255,0.28);
-      color: #fff;
-      padding: 8px 22px;
-      border-radius: 50px;
-      cursor: pointer;
-      font-size: 0.88rem;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      transition: background 0.18s;
-    }
-
+    .controls { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .refresh-btn, .pause-btn { background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.28); color: #fff; padding: 8px 22px; border-radius: 50px; cursor: pointer; font-size: 0.88rem; letter-spacing: 1px; text-transform: uppercase; transition: background 0.18s; }
     .refresh-btn:hover, .pause-btn:hover { background: rgba(255,255,255,0.22); }
-
     .countdown-ring { position: relative; width: 30px; height: 30px; flex-shrink: 0; }
     .countdown-ring svg { transform: rotate(-90deg); }
-    .countdown-ring .track    { fill: none; stroke: rgba(255,255,255,0.10); stroke-width: 3; }
+    .countdown-ring .track { fill: none; stroke: rgba(255,255,255,0.10); stroke-width: 3; }
     .countdown-ring .progress { fill: none; stroke: rgba(120,210,255,0.85); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
     .countdown-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 600; }
-
     .updated { text-align: center; margin-top: 10px; font-size: 0.80rem; opacity: 0.70; }
-
-    .status-dot {
-      display: inline-block;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #4ade80;
-      margin-right: 4px;
-      vertical-align: middle;
-      transition: background 0.3s;
-    }
-
+    .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #4ade80; margin-right: 4px; vertical-align: middle; transition: background 0.3s; }
     .status-dot.loading { background: #fbbf24; }
-
-    /* ── Settings gear + dropdown ─────────────────────── */
+    .status-dot.error { background: #ef4444; }
     .settings-wrap { position: relative; }
-
-    .settings-btn {
-      background: rgba(255,255,255,0.10);
-      border: 1px solid rgba(255,255,255,0.20);
-      color: #fff;
-      width: 36px; height: 36px;
-      border-radius: 50%;
-      cursor: pointer;
-      font-size: 1.1rem;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.18s;
-      padding: 0;
-    }
+    .settings-btn { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.20); color: #fff; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: background 0.18s; padding: 0; }
     .settings-btn:hover { background: rgba(255,255,255,0.22); }
-
-    .settings-menu {
-      display: none;
-      position: absolute;
-      top: calc(100% + 8px);
-      right: 0;
-      min-width: 190px;
-      background: rgba(10,28,55,0.96);
-      backdrop-filter: blur(18px);
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 14px;
-      padding: 6px 0;
-      z-index: 100;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.45);
-    }
+    .settings-menu { display: none; position: absolute; top: calc(100% + 8px); right: 0; min-width: 190px; background: rgba(10,28,55,0.96); backdrop-filter: blur(18px); border: 1px solid rgba(255,255,255,0.16); border-radius: 14px; padding: 6px 0; z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,0.45); }
     .settings-menu.open { display: block; }
-
-    .sm-item {
-      padding: 10px 18px;
-      font-size: 0.88rem;
-      cursor: pointer;
-      border-radius: 8px;
-      margin: 1px 6px;
-      transition: background 0.14s;
-      white-space: nowrap;
-    }
-    .sm-item:hover        { background: rgba(255,255,255,0.10); }
-    .sm-item.active       { background: rgba(255,255,255,0.14); font-weight: 700; }
-    .sm-item.sm-impressum { opacity: 0.70; }
-
-    .sm-sep {
-      height: 1px;
-      background: rgba(255,255,255,0.10);
-      margin: 5px 12px;
-    }
-
-    /* ── Impressum Modal ──────────────────────────────── */
-    .modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(4px);
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
-    }
+    .sm-item { padding: 10px 18px; font-size: 0.88rem; cursor: pointer; border-radius: 8px; margin: 1px 6px; transition: background 0.14s; white-space: nowrap; }
+    .sm-item:hover { background: rgba(255,255,255,0.10); }
+    .sm-item.active { background: rgba(255,255,255,0.14); font-weight: 700; }
+    .sm-sep { height: 1px; background: rgba(255,255,255,0.10); margin: 5px 12px; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
     .modal-overlay.open { display: flex; }
-
-    .modal-box {
-      background: rgba(10,28,55,0.97);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 18px;
-      padding: 28px 28px 22px;
-      max-width: 340px;
-      width: 90%;
-      color: #fff;
-      font-size: 0.88rem;
-      line-height: 1.6;
-    }
-    .modal-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      margin-bottom: 14px;
-    }
-    .modal-close {
-      display: block;
-      margin-top: 20px;
-      width: 100%;
-      padding: 10px;
-      border-radius: 50px;
-      border: 1px solid rgba(255,255,255,0.22);
-      background: rgba(255,255,255,0.10);
-      color: #fff;
-      font-size: 0.88rem;
-      cursor: pointer;
-      transition: background 0.18s;
-    }
+    .modal-box { background: rgba(10,28,55,0.97); border: 1px solid rgba(255,255,255,0.18); border-radius: 18px; padding: 28px; max-width: 340px; width: 100%; color: #fff; font-size: 0.88rem; line-height: 1.6; }
+    .fs-modal { display: none; position: fixed; inset: 0; background: #0a1c3a; z-index: 2000; flex-direction: column; padding: 20px; }
+    .fs-modal.open { display: flex; }
+    .fs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 10px; }
+    .fs-title { font-size: 1.2rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .fs-close { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 16px; border-radius: 50px; cursor: pointer; font-size: 0.9rem; }
+    .fs-container { flex: 1; position: relative; width: 100%; min-height: 0; }
+    .toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 10px; }
+    .toast { background: rgba(239, 68, 68, 0.9); color: #fff; padding: 12px 24px; border-radius: 50px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideUp 0.3s ease-out, fadeOut 0.3s ease-in 4.7s forwards; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    .modal-close { display: block; margin-top: 20px; width: 100%; padding: 10px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.10); color: #fff; font-size: 0.88rem; cursor: pointer; transition: background 0.18s; }
     .modal-close:hover { background: rgba(255,255,255,0.22); }
   </style>
 </head>
 <body>
-<div class="page">
 
+<div class="page">
   <div class="header-bar">
     <h1>Wetter</h1>
     <div style="display:flex;align-items:center;gap:10px;">
-      <div class="range-toggle">
-        <button class="range-btn active" id="btn1" onclick="setRange(1)">1 Tag</button>
-        <button class="range-btn"        id="btn3" onclick="setRange(3)">3 Tage</button>
+      <div class="range-toggle" role="group" aria-label="Zeitraum wählen">
+        <button class="range-btn active" id="btn1" onclick="window.setRange(1)" aria-label="1 Tag anzeigen">1 Tag</button>
+        <button class="range-btn"        id="btn3" onclick="window.setRange(3)" aria-label="3 Tage anzeigen">3 Tage</button>
       </div>
       <div class="settings-wrap">
-        <button class="settings-btn" onclick="toggleMenu(event)" title="Einstellungen">⚙</button>
+        <button class="settings-btn" onclick="window.toggleMenu(event)" title="Einstellungen" aria-label="Einstellungen öffnen">⚙</button>
         <div class="settings-menu" id="settings-menu">
-          <div class="sm-item" id="sm-gronenberg" onclick="setLocation('gronenberg')">1 · Gronenberg</div>
-          <div class="sm-item" id="sm-hamburg"    onclick="setLocation('hamburg')">2 · Hamburg</div>
-          <div class="sm-item" id="sm-all"        onclick="setLocation('all')">3 · Alle Standorte</div>
+          <div class="sm-item" id="sm-gronenberg" onclick="window.setLocation('gronenberg')">1 · Gronenberg</div>
+          <div class="sm-item" id="sm-hamburg"    onclick="window.setLocation('hamburg')">2 · Hamburg</div>
+          <div class="sm-item" id="sm-all"        onclick="window.setLocation('all')">3 · Alle Standorte</div>
           <div class="sm-sep"></div>
-          <div class="sm-item" id="sm-gps"        onclick="locateMe()">📍 Meinen Standort</div>
+          <div class="sm-item" id="sm-gps"        onclick="window.locateMe()">📍 Meinen Standort</div>
           <div class="sm-sep"></div>
-          <div class="sm-item sm-impressum"       onclick="showImpressum()">9 · Impressum</div>
+          <div class="sm-item sm-impressum"       onclick="window.showImpressum()">9 · Impressum(7)</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ── Temperatur chart ─────────────────────────────── -->
   <div class="card">
     <div class="chart-head">
-      <span class="card-title" style="margin-bottom:0;">Temperatur &amp; Niederschlag</span>
+      <span class="card-title" onclick="window.openFS('temp')">Temperatur &amp; Niederschlag ↗</span>
       <div class="chart-legend">
         <div class="cl-item" id="leg-hh-temp"><div class="cl-line" style="background:#FFB830;"></div><span style="color:#FFB830;">HH Temp.</span></div>
         <div class="cl-item" id="leg-gr-temp"><div class="cl-line" style="background:#4DD9FF;"></div><span style="color:#4DD9FF;">GR Temp.</span></div>
@@ -390,13 +120,12 @@
         <div class="cl-item" id="leg-gr-rain"><div class="cl-dash" style="border-color:#4DD9FF;"></div>GR Regen</div>
       </div>
     </div>
-    <canvas id="temp-chart" height="160"></canvas>
+    <div class="chart-wrapper" style="height: 300px;"><canvas id="temp-chart"></canvas></div>
   </div>
 
-  <!-- ── Wind chart (Gronenberg only) ─────────────────── -->
   <div class="card" id="wind-card">
     <div class="chart-head">
-      <span class="card-title" style="margin-bottom:0;">Wind · Gronenberg km/h</span>
+      <span class="card-title" onclick="window.openFS('wind')">Wind · Gronenberg km/h ↗</span>
       <div class="wind-thr">
         <div class="wt-item"><div class="wt-dot" style="background:#4ade80;"></div>≤ 15</div>
         <div class="wt-item"><div class="wt-dot" style="background:#facc15;"></div>≤ 25</div>
@@ -404,36 +133,32 @@
         <div class="wt-item"><div class="wt-dot" style="background:#ef4444;"></div>≥ 50</div>
       </div>
     </div>
-    <canvas id="wind-chart" height="120"></canvas>
+    <div class="chart-wrapper" style="height: 240px;"><canvas id="wind-chart"></canvas></div>
   </div>
 
-  <!-- ── Ostsee Wassertemperatur ──────────────────────── -->
   <div class="card" id="sea-card">
     <div class="chart-head">
-      <span class="card-title" style="margin-bottom:0;">🌊 Ostsee · Scharbeutz</span>
+      <span class="card-title" onclick="window.openFS('sea')">Ostsee · Scharbeutz ↗</span>
       <span id="sea-current" style="font-size:1.05rem;font-weight:700;opacity:0.9;"></span>
     </div>
-    <canvas id="sea-chart" height="80"></canvas>
+    <div class="chart-wrapper" style="height: 220px;"><canvas id="sea-chart"></canvas></div>
   </div>
 
-  <!-- ── 7-day forecast ───────────────────────────────── -->
   <div class="card">
     <div class="card-title">7-Tage-Vorschau</div>
     <table class="fc-table" id="fc-table"></table>
   </div>
 
-  <!-- ── Controls ─────────────────────────────────────── -->
   <div class="controls">
-    <button class="refresh-btn" onclick="manualRefresh()">Aktualisieren</button>
+    <button class="refresh-btn" onclick="window.manualRefresh()">Aktualisieren</button>
     <div class="countdown-ring">
       <svg width="30" height="30" viewBox="0 0 30 30">
-        <circle class="track"    cx="15" cy="15" r="12"/>
-        <circle class="progress" cx="15" cy="15" r="12"
-          id="ring-progress" stroke-dasharray="75.40" stroke-dashoffset="0"/>
+        <circle class="track" cx="15" cy="15" r="12"/>
+        <circle class="progress" cx="15" cy="15" r="12" id="ring-progress" stroke-dasharray="75.40" stroke-dashoffset="0"/>
       </svg>
       <div class="countdown-num" id="countdown-num">15</div>
     </div>
-    <button class="pause-btn" id="pause-btn" onclick="togglePause()">Pause</button>
+    <button class="pause-btn" id="pause-btn" onclick="window.togglePause()">Pause</button>
   </div>
 
   <p class="updated">
@@ -441,955 +166,29 @@
     <span id="updated-text">Wird geladen …</span>
   </p>
 
-</div><!-- .page -->
+</div>
 
-<!-- ── Impressum Modal ──────────────────────────────── -->
-<div id="impressum-overlay" class="modal-overlay" onclick="closeImpressum()">
+<div id="fs-modal" class="fs-modal">
+  <div class="fs-header">
+    <div class="fs-title" id="fs-title">Chart</div>
+    <button class="fs-close" onclick="window.closeFS()">Schließen ×</button>
+  </div>
+  <div class="fs-container"><canvas id="fs-canvas"></canvas></div>
+</div>
+
+<div id="impressum-overlay" class="modal-overlay" onclick="window.closeImpressum()">
   <div class="modal-box" onclick="event.stopPropagation()">
     <div class="modal-title">Impressum</div>
     <p>Diese Seite ist ein privates, nicht-kommerzielles Projekt.</p>
     <p style="margin-top:8px;">Betreiber: gronenberg.info</p>
     <p style="margin-top:8px;opacity:0.7;font-size:0.78rem;">Wetterdaten: Open-Meteo API (open-meteo.com)</p>
-    <button class="modal-close" onclick="closeImpressum()">Schließen</button>
+    <button class="modal-close" onclick="window.closeImpressum()">Schließen</button>
   </div>
 </div>
 
-<script>
-  /* ══════════════════════════════════════════════════════
-     CONFIG
-  ══════════════════════════════════════════════════════ */
-  const CITIES = [
-    { name: 'Hamburg',    sub: 'Hansestadt',                 lat: 53.5753, lon: 10.0153 },
-    { name: 'Gronenberg', sub: '23684 · Schleswig-Holstein', lat: 53.9450, lon: 10.6800 },
-  ];
+<div class="toast-container" id="toast-container"></div>
 
-  const COL = [
-    { line: '#FFB830', fill: 'rgba(255,184,48,0.36)',  bar: 'rgba(255,184,48,0.52)', barB: 'rgba(255,184,48,0.78)' },
-    { line: '#4DD9FF', fill: 'rgba(77,217,255,0.28)',  bar: 'rgba(77,217,255,0.48)', barB: 'rgba(77,217,255,0.72)' },
-  ];
-
-  const WMO = {
-    0:['Klarer Himmel','☀️'],    1:['Überwiegend klar','🌤️'],
-    2:['Teilweise bewölkt','⛅'], 3:['Bedeckt','☁️'],
-    45:['Nebel','🌫️'],           48:['Raureif-Nebel','🌫️'],
-    51:['Leichter Niesel','🌦️'], 53:['Nieselregen','🌦️'],
-    55:['Starker Niesel','🌧️'],  61:['Leichter Regen','🌧️'],
-    63:['Regen','🌧️'],           65:['Starker Regen','🌧️'],
-    71:['Leicht. Schnee','🌨️'],  73:['Schneefall','❄️'],
-    75:['Starker Schnee','❄️'],  77:['Schneekörner','🌨️'],
-    80:['Leichte Schauer','🌦️'], 81:['Schauer','🌧️'],
-    82:['Starke Schauer','⛈️'],  85:['Schneeschauer','🌨️'],
-    86:['Starke Schnee-S.','❄️'],95:['Gewitter','⛈️'],
-    96:['Gewitter+Hagel','⛈️'],  99:['Schw. Gewitter','⛈️'],
-  };
-
-  function wmo(c)    { return WMO[c] ?? ['Unbekannt','🌡️']; }
-  function wdir(deg) { return ['N','NO','O','SO','S','SW','W','NW'][Math.round(deg/45)%8]; }
-  const DN = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-
-  /* ══════════════════════════════════════════════════════
-     STATE
-  ══════════════════════════════════════════════════════ */
-  let currentRange = 1;
-
-  // Standort-Priorität: URL-Parameter → localStorage → 'all'
-  const _locParam = new URLSearchParams(location.search).get('loc');
-  const _locValid = ['hamburg','gronenberg','all'];
-  let currentLocation = (_locParam && _locValid.includes(_locParam.toLowerCase()))
-    ? _locParam.toLowerCase()
-    : (localStorage.getItem('wetter-loc') || 'gronenberg');
-  let cachedData      = null;
-  let marineCache     = null;
-  let tempChart       = null;
-  let windChart       = null;
-  let seaChart        = null;
-  let shellBuilt      = false;
-
-  /* ══════════════════════════════════════════════════════
-     API
-  ══════════════════════════════════════════════════════ */
-  async function fetchCity(city) {
-    const p = new URLSearchParams({
-      latitude: city.lat, longitude: city.lon,
-      current: ['temperature_2m','relative_humidity_2m','apparent_temperature',
-                'weather_code','wind_speed_10m','wind_direction_10m',
-                'precipitation','uv_index'].join(','),
-      hourly:  ['temperature_2m','precipitation','wind_speed_10m','wind_direction_10m','weather_code'].join(','),
-      daily:   ['weather_code','temperature_2m_max','temperature_2m_min',
-                'precipitation_sum','sunrise','sunset'].join(','),
-      timezone: 'Europe/Berlin',
-      forecast_days: 7,
-    });
-    const r = await fetch(`https://api.open-meteo.com/v1/forecast?${p}`);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
-  }
-
-  async function fetchMarine() {
-    const p = new URLSearchParams({
-      latitude: 54.02334, longitude: 10.77672,
-      hourly:   ['sea_surface_temperature','wave_height'].join(','),
-      timezone: 'Europe/Berlin',
-      forecast_days: 7,
-    });
-    const r = await fetch(`https://marine-api.open-meteo.com/v1/marine?${p}`);
-    if (!r.ok) throw new Error(`Marine HTTP ${r.status}`);
-    return r.json();
-  }
-
-  /* ══════════════════════════════════════════════════════
-     BUILD SHELL (once)
-  ══════════════════════════════════════════════════════ */
-  function buildShell(allData) {
-    /* ── Forecast table ── */
-    const days = allData[0].daily.time;
-    const dayLabels = days.map((t, i) => i === 0 ? 'Heute' : DN[new Date(t).getDay()]);
-
-    document.getElementById('fc-table').innerHTML = `
-      <tr class="fc-dh">
-        <td></td>
-        ${dayLabels.map(d => `<td>${d}</td>`).join('')}
-      </tr>
-      ${CITIES.map((c, ci) => `
-        <tr class="fc-city-row fc-row-${ci}">
-          <td class="fc-city-lbl">
-            <span style="background:${ci===0?'#FFB830':'#4DD9FF'};"></span>
-            ${ci===0?'HH':'GR'}
-          </td>
-          ${days.map((_,di) => `
-            <td>
-              <div class="fc-icon" id="fc-${ci}-${di}-icon"></div>
-              <div class="fc-max"  id="fc-${ci}-${di}-max"></div>
-              <div class="fc-min"  id="fc-${ci}-${di}-min"></div>
-            </td>`).join('')}
-        </tr>
-        ${ci === 0 ? '<tr class="fc-city-sep fc-row-sep"><td colspan="8"></td></tr>' : ''}`
-      ).join('')}
-      <tr class="fc-info-sep"><td colspan="8"></td></tr>
-      <tr class="fc-info-row">
-        <td class="fc-info-lbl">🌅<span class="fc-lbl-txt">Sonne</span></td>
-        ${days.map((_,di) => `<td class="fc-time" id="fc-sr-${di}"></td>`).join('')}
-      </tr>
-      <tr class="fc-info-row">
-        <td class="fc-info-lbl">🌇<span class="fc-lbl-txt">Sonne</span></td>
-        ${days.map((_,di) => `<td class="fc-time" id="fc-ss-${di}"></td>`).join('')}
-      </tr>
-      <tr class="fc-info-sep"><td colspan="8"></td></tr>
-      <tr class="fc-info-row">
-        <td class="fc-info-lbl">🌕<span class="fc-lbl-txt">Mond</span></td>
-        ${days.map((_,di) => `<td class="fc-time" id="fc-mr-${di}"></td>`).join('')}
-      </tr>
-      <tr class="fc-info-row">
-        <td class="fc-info-lbl">🌑<span class="fc-lbl-txt">Mond</span></td>
-        ${days.map((_,di) => `<td class="fc-time" id="fc-ms-${di}"></td>`).join('')}
-      </tr>`;
-
-    shellBuilt = true;
-  }
-
-  /* ══════════════════════════════════════════════════════
-     UPDATE CARD VALUES (in-place, no DOM rebuild)
-  ══════════════════════════════════════════════════════ */
-  function fmtTime(iso) {
-    if (!iso) return '–';
-    const t = iso.includes('T') ? iso.split('T')[1].slice(0, 5) : iso.slice(-5);
-    return t || '–';
-  }
-
-  function fmtHHMM(date) {
-    return String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
-  }
-
-  function updateCards(allData) {
-    allData.forEach((data, i) => {
-      const d = data.daily;
-      d.time.forEach((_, j) => {
-        const [, fi] = wmo(d.weather_code[j]);
-        set(`fc-${i}-${j}-icon`, fi);
-        set(`fc-${i}-${j}-max`,  Math.round(d.temperature_2m_max[j]) + '°');
-        set(`fc-${i}-${j}-min`,  Math.round(d.temperature_2m_min[j]) + '°');
-      });
-    });
-
-    // Sonnen- & Mondzeiten
-    const d0  = allData[0].daily;
-    const lat = CITIES[1].lat, lon = CITIES[1].lon; // Gronenberg
-    d0.time.forEach((dateStr, j) => {
-      set(`fc-sr-${j}`, fmtTime(d0.sunrise?.[j]));
-      set(`fc-ss-${j}`, fmtTime(d0.sunset?.[j]));
-      // Mondzeiten per SunCalc
-      const mt = SunCalc.getMoonTimes(new Date(dateStr + 'T12:00:00'), lat, lon);
-      set(`fc-mr-${j}`, mt.rise ? fmtHHMM(mt.rise) : '–');
-      set(`fc-ms-${j}`, mt.set  ? fmtHHMM(mt.set)  : '–');
-    });
-  }
-
-  function set(id, val) {
-    const el = document.getElementById(id);
-    if (el && el.textContent !== String(val)) el.textContent = val;
-  }
-
-  /* ══════════════════════════════════════════════════════
-     FIND START INDEX — first entry >= current hour
-  ══════════════════════════════════════════════════════ */
-  function startIndex(times) {
-    const now = new Date();
-    now.setMinutes(0, 0, 0); // floor to current hour
-    for (let i = 0; i < times.length; i++) {
-      if (new Date(times[i]) >= now) return i;
-    }
-    return 0;
-  }
-
-  /* ══════════════════════════════════════════════════════
-     X-ACHSE: Stundengitter (jede Stunde senkrecht)
-  ══════════════════════════════════════════════════════ */
-  function xAxisCfg() {
-    function isoHour(lbl) {
-      return (typeof lbl === 'string' && lbl.length >= 13) ? parseInt(lbl.slice(11, 13)) : -1;
-    }
-    function isoDay(lbl) {
-      return (typeof lbl === 'string' && lbl.length >= 10)
-        ? DN[new Date(lbl.slice(0, 10) + 'T12:00').getDay()] : '';
-    }
-    return {
-      ticks: {
-        color: 'rgba(255,255,255,0.85)',
-        font: { size: 11 },
-        maxRotation: 0,
-        autoSkip: false,
-        align: 'center',
-        callback: function(val) {
-          const lbl = this.getLabelForValue(val) ?? '';
-          const h = isoHour(lbl);
-          if (h < 0) return '';
-          const count = this.chart.data.labels?.length ?? 24;
-          const showEvery = count <= 24 ? 3 : 6;
-          if (h % showEvery !== 0) return '';
-          return [String(h).padStart(2, '0'), isoDay(lbl)];
-        },
-      },
-      grid: {
-        color: (ctx) => {
-          const h = isoHour(ctx.chart.data?.labels?.[ctx.index]);
-          return h === 0 ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.10)';
-        },
-        lineWidth: (ctx) => {
-          const h = isoHour(ctx.chart.data?.labels?.[ctx.index]);
-          return h === 0 ? 2 : 1;
-        },
-      },
-    };
-  }
-
-  /* Mitternacht-Linie bis in den Tick-Bereich verlängern */
-  const midnightLinePlugin = {
-    id: 'midnightLine',
-    afterDraw(chart) {
-      const { ctx, chartArea, scales } = chart;
-      const xScale = scales.x;
-      if (!xScale || !chartArea) return;
-      const labels = chart.data.labels ?? [];
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255,255,255,0.38)';
-      ctx.lineWidth = 2;
-      labels.forEach((lbl, i) => {
-        if (typeof lbl !== 'string' || lbl.length < 13) return;
-        if (parseInt(lbl.slice(11, 13)) !== 0) return;
-        const x = xScale.getPixelForValue(i);
-        ctx.beginPath();
-        ctx.moveTo(x, chartArea.bottom);
-        ctx.lineTo(x, chartArea.bottom + 30);
-        ctx.stroke();
-      });
-      ctx.restore();
-    },
-  };
-
-  /* ══════════════════════════════════════════════════════
-     TAG / NACHT HINTERGRUND
-  ══════════════════════════════════════════════════════ */
-  function isNightAt(isoStr) {
-    const date = new Date(isoStr);
-    const sun  = SunCalc.getTimes(date, CITIES[1].lat, CITIES[1].lon);
-    return date < sun.sunrise || date > sun.sunset;
-  }
-
-  const dayNightPlugin = {
-    id: 'dayNight',
-    beforeDatasetsDraw(chart) {
-      const { ctx, chartArea: a } = chart;
-      if (!a || !chart._isNight?.length) return;
-
-      const n    = chart._isNight;
-      const slot = a.width / n.length;
-
-      ctx.save();
-      n.forEach((night, i) => {
-        ctx.fillStyle = night
-          ? 'rgba(0, 5, 55, 0.38)'        // Nacht: dunkles Blau
-          : 'rgba(255, 215, 100, 0.11)';  // Tag: warmes Gelb
-        ctx.fillRect(a.left + i * slot, a.top, slot + 0.5, a.height);
-      });
-      ctx.restore();
-    },
-  };
-
-  /* ══════════════════════════════════════════════════════
-     CHART DATA PREP (temperature + weather codes)
-  ══════════════════════════════════════════════════════ */
-  function prepTempData(allData, range) {
-    const step  = range === 1 ? 1 : 2;
-    const src   = allData[0].hourly.time;
-    const start = startIndex(src);
-    const end   = Math.min(start + range * 24, src.length);
-
-    const labels = [];
-    for (let i = start; i < end; i += step) {
-      labels.push(src[i]);  // ISO-String "2026-04-14T21:00"
-    }
-
-    const temps = allData.map(d => {
-      const out = [];
-      for (let i = start; i < end; i += step)
-        out.push(d.hourly.temperature_2m[i]);
-      return out;
-    });
-
-    const codes = allData.map(d => {
-      const out = [];
-      for (let i = start; i < end; i += step)
-        out.push(d.hourly.weather_code[i] ?? 0);
-      return out;
-    });
-
-    const rains = allData.map(d => {
-      const out = [];
-      for (let i = start; i < end; i += step) {
-        let s = 0;
-        for (let j = i; j < Math.min(i + step, end, d.hourly.time.length); j++)
-          s += (d.hourly.precipitation[j] ?? 0);
-        out.push(Math.round(s * 10) / 10);
-      }
-      return out;
-    });
-
-    const nightArr = [];
-    for (let i = start; i < end; i += step) nightArr.push(isNightAt(src[i]));
-
-    return { labels, temps, codes, rains, nightArr };
-  }
-
-  /* ══════════════════════════════════════════════════════
-     WIND DATA PREP (Gronenberg only)
-  ══════════════════════════════════════════════════════ */
-  function prepWindData(allData, range) {
-    const gr    = allData[1];
-    const step  = range === 1 ? 1 : 2;
-    const src   = gr.hourly.time;
-    const start = startIndex(src);
-    const end   = Math.min(start + range * 24, src.length);
-
-    const labels = [], winds = [], dirs = [], nightArr = [];
-    for (let i = start; i < end; i += step) {
-      labels.push(src[i]);  // ISO-String "2026-04-14T21:00"
-      winds.push(Math.round(gr.hourly.wind_speed_10m[i]));
-      dirs.push(gr.hourly.wind_direction_10m[i]);
-      nightArr.push(isNightAt(src[i]));
-    }
-
-    return { labels, winds, dirs, nightArr };
-  }
-
-  /* ══════════════════════════════════════════════════════
-     WIND COLOUR HELPERS
-  ══════════════════════════════════════════════════════ */
-  function rainDotColor(v) {
-    if (v < 0.5) return 'rgba(74,222,128,0.95)';   // grün
-    if (v < 1.0) return 'rgba(250,204,21,0.95)';   // gelb
-    if (v < 2.0) return 'rgba(251,146,60,0.95)';   // orange
-    return             'rgba(239,68,68,0.95)';      // rot
-  }
-
-  function windFill(v) {
-    if (v <= 15) return 'rgba(74,222,128,0.80)';
-    if (v <= 25) return 'rgba(250,204,21,0.80)';
-    if (v <  50) return 'rgba(251,146,60,0.82)';
-    return              'rgba(239,68,68,0.88)';
-  }
-  function windBorder(v) {
-    if (v <= 15) return 'rgba(74,222,128,1)';
-    if (v <= 25) return 'rgba(250,204,21,1)';
-    if (v <  50) return 'rgba(251,146,60,1)';
-    return              'rgba(239,68,68,1)';
-  }
-
-  /* ══════════════════════════════════════════════════════
-     WIND ZONES PLUGIN (background bands + dashes)
-  ══════════════════════════════════════════════════════ */
-  const windZonesPlugin = {
-    id: 'windZones',
-    beforeDatasetsDraw(chart) {
-      const { ctx, chartArea: a, scales: { y } } = chart;
-      if (!a) return;
-      const bands = [
-        { from: 0,  to: 15,    color: 'rgba(74,222,128,0.06)' },
-        { from: 15, to: 25,    color: 'rgba(250,204,21,0.07)' },
-        { from: 25, to: 50,    color: 'rgba(251,146,60,0.07)' },
-        { from: 50, to: y.max, color: 'rgba(239,68,68,0.09)'  },
-      ];
-      ctx.save();
-      bands.forEach(b => {
-        if (b.from >= y.max) return;
-        const top = y.getPixelForValue(Math.min(b.to, y.max));
-        const bot = y.getPixelForValue(b.from);
-        ctx.fillStyle = b.color;
-        ctx.fillRect(a.left, top, a.width, bot - top);
-      });
-      ctx.setLineDash([3,3]);
-      ctx.lineWidth = 1;
-      [[15,'rgba(74,222,128,0.38)'],[25,'rgba(250,204,21,0.38)'],[50,'rgba(239,68,68,0.38)']].forEach(([v,c]) => {
-        if (v > y.max) return;
-        const py = y.getPixelForValue(v);
-        ctx.strokeStyle = c;
-        ctx.beginPath(); ctx.moveTo(a.left, py); ctx.lineTo(a.right, py); ctx.stroke();
-      });
-      ctx.restore();
-    },
-  };
-
-  /* ══════════════════════════════════════════════════════
-     WEATHER SYMBOL PLUGIN — emojis on temperature curves
-  ══════════════════════════════════════════════════════ */
-  const weatherSymbolPlugin = {
-    id: 'weatherSymbols',
-    afterDatasetsDraw(chart) {
-      const { ctx } = chart;
-      const everyN = chart._symEvery ?? 3;
-
-      chart.data.datasets.forEach((ds, dsIdx) => {
-        if (!ds.codes) return;
-        const meta = chart.getDatasetMeta(dsIdx);
-        if (ds.hidden || meta.hidden) return;
-        ctx.save();
-        ctx.font = '13px sans-serif';
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'bottom';
-        ds.codes.forEach((code, i) => {
-          if (i % everyN !== 0) return;
-          const pt = meta.data[i];
-          if (!pt) return;
-          const [, emoji] = wmo(code ?? 0);
-          ctx.fillText(emoji, pt.x, pt.y - 5);
-        });
-        ctx.restore();
-      });
-
-      // Rain gear symbol above precipitation line
-      chart.data.datasets.forEach((ds, dsIdx) => {
-        if (!ds.isRain) return;
-        const meta = chart.getDatasetMeta(dsIdx);
-        if (ds.hidden || meta.hidden) return;
-        ctx.save();
-        ctx.font = '12px sans-serif';
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'bottom';
-        ds.data.forEach((val, i) => {
-          if ((val ?? 0) < 0.3) return;
-          if (i % everyN !== 0) return;
-          const pt = meta.data[i];
-          if (!pt) return;
-          ctx.fillText('🌂', pt.x, pt.y - 6);
-        });
-        ctx.restore();
-      });
-    },
-  };
-
-  /* ══════════════════════════════════════════════════════
-     TEMP CHART — init once
-  ══════════════════════════════════════════════════════ */
-  function initTempChart(allData, range) {
-    const { labels, temps, codes, rains, nightArr } = prepTempData(allData, range);
-    const ctx = document.getElementById('temp-chart').getContext('2d');
-
-    const grads = allData.map((_, i) => {
-      const g = ctx.createLinearGradient(0, 0, 0, 240);
-      g.addColorStop(0, COL[i].fill); g.addColorStop(1, 'rgba(0,0,0,0)');
-      return g;
-    });
-
-    tempChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          // rain dotted lines (order 3+4 = behind temp lines)
-          { type:'line', label:'HH Regen', data:rains[0], isRain:true, borderColor:'rgba(255,184,48,0.55)', borderWidth:1.5, borderDash:[4,4], pointRadius:rains[0].map(v=>v>0?4:0), pointBackgroundColor:rains[0].map(rainDotColor), pointBorderWidth:0, tension:0.3, fill:false, yAxisID:'yRain', order:3 },
-          { type:'line', label:'GR Regen', data:rains[1], isRain:true, borderColor:'rgba(77,217,255,0.55)',  borderWidth:1.5, borderDash:[4,4], pointRadius:rains[1].map(v=>v>0?4:0), pointBackgroundColor:rains[1].map(rainDotColor), pointBorderWidth:0, tension:0.3, fill:false, yAxisID:'yRain', order:4 },
-          // temp lines (order 1+2 = in front)
-          { type:'line', label:'HH Temp.', data:temps[0], codes:codes[0], borderColor:COL[0].line, backgroundColor:grads[0], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:1 },
-          { type:'line', label:'GR Temp.', data:temps[1], codes:codes[1], borderColor:COL[1].line, backgroundColor:grads[1], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:2 },
-        ],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: true,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y}${c.datasetIndex < 2 ? ' mm' : '°C'}` }},
-        },
-        scales: {
-          x: xAxisCfg(),
-          yTemp: { position:'left',  ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
-          yRain: { position:'right', beginAtZero:true, ticks:{ color:'rgba(140,210,255,0.90)', font:{size:11}, callback: v => v+'mm' }, grid:{ drawOnChartArea:false }},
-        },
-        animation: { duration: 350 },
-        layout: { padding: { top: 24 } },  // room for symbols above lines
-      },
-      plugins: [dayNightPlugin, weatherSymbolPlugin, midnightLinePlugin],
-    });
-    tempChart._isNight  = nightArr;
-    tempChart._symEvery = range === 1 ? 3 : 4;
-  }
-
-  function updateTempData(allData, range, animate) {
-    const { labels, temps, codes, rains, nightArr } = prepTempData(allData, range);
-    tempChart.data.labels = labels;
-    tempChart.data.datasets[0].data                 = rains[0];
-    tempChart.data.datasets[0].pointRadius          = rains[0].map(v => v > 0 ? 4 : 0);
-    tempChart.data.datasets[0].pointBackgroundColor = rains[0].map(rainDotColor);
-    tempChart.data.datasets[1].data                 = rains[1];
-    tempChart.data.datasets[1].pointRadius          = rains[1].map(v => v > 0 ? 4 : 0);
-    tempChart.data.datasets[1].pointBackgroundColor = rains[1].map(rainDotColor);
-    tempChart.data.datasets[2].data  = temps[0];
-    tempChart.data.datasets[2].codes = codes[0];
-    tempChart.data.datasets[3].data  = temps[1];
-    tempChart.data.datasets[3].codes = codes[1];
-    tempChart._isNight  = nightArr;
-    tempChart._symEvery = range === 1 ? 3 : 4;
-    tempChart.update(animate ? undefined : 'none');
-  }
-
-  /* ══════════════════════════════════════════════════════
-     WIND ARROW PLUGIN
-  ══════════════════════════════════════════════════════ */
-  const windArrowPlugin = {
-    id: 'windArrows',
-    afterDatasetsDraw(chart) {
-      const { ctx, scales: { x, y } } = chart;
-      const ds   = chart.data.datasets[0];
-      const meta = chart.getDatasetMeta(0);
-      if (!ds.dirs || !meta.data.length) return;
-
-      // only draw if bars are wide enough
-      const barW = meta.data[0]?.width ?? 0;
-      if (barW < 6) return;
-
-      ctx.save();
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font         = `bold ${Math.max(9, Math.min(13, barW * 0.65))}px sans-serif`;
-
-      meta.data.forEach((bar, i) => {
-        const spd = ds.data[i];
-        const dir = ds.dirs[i];
-        if (spd == null || dir == null) return;
-
-        const bx = bar.x;
-        const by = y.getPixelForValue(spd) - 9;
-
-        ctx.save();
-        ctx.translate(bx, by);
-        // dir = meteorological FROM-direction; rotate arrow so it points where wind blows TO
-        ctx.rotate(((dir + 180) % 360) * Math.PI / 180);
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        ctx.fillText('↑', 0, 0);
-        ctx.restore();
-      });
-
-      ctx.restore();
-    },
-  };
-
-  /* ══════════════════════════════════════════════════════
-     WIND CHART — init once, Gronenberg only
-  ══════════════════════════════════════════════════════ */
-  function initWindChart(allData, range) {
-    const { labels, winds, dirs, nightArr } = prepWindData(allData, range);
-    const ctx = document.getElementById('wind-chart').getContext('2d');
-
-    windChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Gronenberg',
-          data:  winds,
-          dirs,                              // custom property for arrow plugin
-          backgroundColor: winds.map(windFill),
-          borderColor:     winds.map(windBorder),
-          borderWidth: 1,
-          borderRadius: 3,
-        }],
-      },
-      options: {
-        responsive:true, maintainAspectRatio:true,
-        interaction:{ mode:'index', intersect:false },
-        plugins:{
-          legend:{ display:false },
-          tooltip:{
-            callbacks:{
-              label: c => {
-                const dir = c.dataset.dirs?.[c.dataIndex];
-                const dirStr = dir != null ? ` · ${wdir(dir)}` : '';
-                return ` ${c.parsed.y} km/h${dirStr}`;
-              },
-            },
-          },
-        },
-        scales:{
-          x: xAxisCfg(),
-          y:{ beginAtZero:true, ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+' km/h' }, grid:{ color:'rgba(255,255,255,0.08)' }},
-          _r:{ position:'right', ticks:{ display:false, callback: v => v+'mm' }, grid:{ drawOnChartArea:false } },
-        },
-        animation:{ duration:350 },
-        layout:{ padding:{ top: 18 } },       // room for arrows above bars
-      },
-      plugins: [dayNightPlugin, windZonesPlugin, windArrowPlugin, midnightLinePlugin],
-    });
-    windChart._isNight = nightArr;
-  }
-
-  function updateWindData(allData, range, animate) {
-    const { labels, winds, dirs, nightArr } = prepWindData(allData, range);
-    windChart.data.labels = labels;
-    windChart.data.datasets[0].data            = winds;
-    windChart.data.datasets[0].dirs            = dirs;
-    windChart.data.datasets[0].backgroundColor = winds.map(windFill);
-    windChart.data.datasets[0].borderColor     = winds.map(windBorder);
-    windChart._isNight = nightArr;
-    windChart.update(animate ? undefined : 'none');
-  }
-
-  /* ══════════════════════════════════════════════════════
-     OSTSEE WASSERTEMPERATUR
-  ══════════════════════════════════════════════════════ */
-  function prepSeaData(marine, range) {
-    const step   = range === 1 ? 1 : 2;
-    const src    = marine.hourly.time;
-    const temps  = marine.hourly.sea_surface_temperature;
-    const waves  = marine.hourly.wave_height;
-    const start  = startIndex(src);
-    const end    = Math.min(start + range * 24, src.length);
-
-    const labels = [], values = [], waveVals = [], nightArr = [];
-    for (let i = start; i < end; i += step) {
-      labels.push(src[i]);  // ISO-String "2026-04-14T21:00"
-      values.push(temps[i]  != null ? Math.round(temps[i]  * 10) / 10 : null);
-      waveVals.push(waves[i] != null ? Math.round(waves[i] * 100) / 100 : null);
-      nightArr.push(isNightAt(src[i]));
-    }
-    return { labels, values, waveVals, nightArr };
-  }
-
-  // Wassertemperatur-Farbe (Linie, per Segment)
-  function seaTempColor(v) {
-    if (v == null) return 'rgba(0,200,220,0.6)';
-    if (v <= 10)   return '#4488FF';   // blau
-    if (v <= 15)   return '#66DD88';   // hellgrün
-    if (v <= 20)   return '#FFE944';   // hellgelb
-    if (v <= 24)   return '#FF9933';   // orange
-    if (v <= 26)   return '#FF6666';   // hellrot
-    return                '#DD1111';   // rot
-  }
-
-  // Wellenhöhe-Farbe (Balken, in Metern)
-  function waveColor(v) {
-    if (v == null) return 'rgba(68,136,255,0.55)';
-    if (v <= 0.10) return 'rgba(68,136,255,0.65)';   // blau      0–10 cm
-    if (v <= 0.50) return 'rgba(255,230,50,0.70)';   // gelb     10–50 cm
-    if (v <= 1.00) return 'rgba(255,150,40,0.75)';   // orange  50–100 cm
-    if (v <= 1.50) return 'rgba(255,100,100,0.78)';  // hellrot 100–150 cm
-    return                'rgba(210,20,20,0.85)';    // rot      >150 cm
-  }
-
-  function seaHeaderText(values, waveVals) {
-    const cur  = values.find(v => v != null);
-    const wave = waveVals.find(v => v != null);
-    return [
-      cur  != null ? cur  + ' °C' : null,
-      wave != null ? '〰 ' + Math.round(wave * 100) + ' cm' : null,
-    ].filter(Boolean).join('  ');
-  }
-
-  function initSeaChart(marine, range) {
-    const { labels, values, waveVals, nightArr } = prepSeaData(marine, range);
-    const ctx = document.getElementById('sea-chart').getContext('2d');
-
-    seaChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          // Wellenhöhe — Balken, rechte Achse
-          {
-            type: 'bar',
-            label: 'Wellenhöhe',
-            data: waveVals,
-            backgroundColor: waveVals.map(waveColor),
-            borderWidth: 0,
-            borderRadius: 2,
-            yAxisID: 'yWave',
-            order: 2,
-            spanGaps: true,
-          },
-          // Wassertemperatur — Linie, linke Achse, farbige Segmente
-          {
-            type: 'line',
-            label: 'Wassertemperatur',
-            data: values,
-            borderColor: '#00C8DC',   // Fallback; überschrieben durch segment
-            backgroundColor: 'rgba(0,180,200,0.07)',
-            borderWidth: 2.5,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            tension: 0.35,
-            fill: true,
-            yAxisID: 'yTemp',
-            order: 1,
-            spanGaps: true,
-            segment: {
-              borderColor: ctx => seaTempColor(ctx.p1.parsed.y ?? ctx.p0.parsed.y),
-            },
-          },
-        ],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: true,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: {
-            label: c => c.datasetIndex === 0
-              ? ` Wellen: ${Math.round((c.parsed.y ?? 0) * 100)} cm`
-              : ` Wasser: ${c.parsed.y} °C`,
-          }},
-        },
-        scales: {
-          x: xAxisCfg(),
-          yTemp: { position:'left',  ticks:{ color:'rgba(255,255,255,0.85)', font:{size:11}, callback: v => v+'°' }, grid:{ color:'rgba(255,255,255,0.08)' }},
-          yWave: { position:'right', beginAtZero:true,
-                   ticks:{ color:'rgba(140,200,255,0.85)', font:{size:11}, stepSize:0.05, maxTicksLimit:8, callback: v => Math.round(v*100)+'cm' },
-                   grid:{ drawOnChartArea:false }},
-        },
-        animation: { duration: 350 },
-      },
-      plugins: [dayNightPlugin, midnightLinePlugin],
-    });
-
-    seaChart._isNight = nightArr;
-    const txt = seaHeaderText(values, waveVals);
-    if (txt) document.getElementById('sea-current').textContent = txt;
-  }
-
-  function updateSeaData(marine, range, animate) {
-    const { labels, values, waveVals, nightArr } = prepSeaData(marine, range);
-    seaChart.data.labels = labels;
-    seaChart.data.datasets[0].data            = waveVals;
-    seaChart.data.datasets[0].backgroundColor = waveVals.map(waveColor);
-    seaChart.data.datasets[1].data            = values;
-    seaChart._isNight = nightArr;
-    seaChart.update(animate ? undefined : 'none');
-    const txt = seaHeaderText(values, waveVals);
-    if (txt) document.getElementById('sea-current').textContent = txt;
-  }
-
-  /* ══════════════════════════════════════════════════════
-     SETTINGS MENU
-  ══════════════════════════════════════════════════════ */
-  function toggleMenu(e) {
-    e.stopPropagation();
-    document.getElementById('settings-menu').classList.toggle('open');
-  }
-
-  document.addEventListener('click', () => {
-    document.getElementById('settings-menu').classList.remove('open');
-  });
-
-  function setLocation(loc) {
-    currentLocation = loc;
-    localStorage.setItem('wetter-loc', loc);
-    document.getElementById('settings-menu').classList.remove('open');
-    updateMenuActive();
-    applyLocationFilter();
-  }
-
-  function updateMenuActive() {
-    ['gronenberg','hamburg','all'].forEach(k => {
-      document.getElementById('sm-' + k)
-        ?.classList.toggle('active', currentLocation === k);
-    });
-  }
-
-  function applyLocationFilter() {
-    const showHH = currentLocation === 'hamburg'    || currentLocation === 'all';
-    const showGR = currentLocation === 'gronenberg' || currentLocation === 'all';
-
-    // Temp chart dataset visibility (Chart.js 4.x: meta.hidden)
-    if (tempChart) {
-      [[0, !showHH],[1, !showGR],[2, !showHH],[3, !showGR]].forEach(([i, hide]) => {
-        tempChart.getDatasetMeta(i).hidden = hide;
-      });
-      tempChart.update('none');
-    }
-
-    // Wind card (Gronenberg only) — hide when Hamburg-only
-    const windCard = document.getElementById('wind-card');
-    if (windCard) windCard.style.display = showGR ? '' : 'none';
-
-    // Forecast table rows
-    document.querySelectorAll('.fc-row-0, .fc-row-sep').forEach(el =>
-      el.style.display = showHH ? '' : 'none');
-    document.querySelectorAll('.fc-row-1').forEach(el =>
-      el.style.display = showGR ? '' : 'none');
-
-    // Legende Temperaturkarte
-    const d = v => v ? '' : 'none';
-    const leg = id => { const el = document.getElementById(id); if (el) el.style.display = d(id.includes('hh') ? showHH : showGR); };
-    ['leg-hh-temp','leg-hh-rain'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = d(showHH); });
-    ['leg-gr-temp','leg-gr-rain'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = d(showGR); });
-  }
-
-  /* ── GPS Standort ───────────────────────────────────── */
-  function locateMe() {
-    document.getElementById('settings-menu').classList.remove('open');
-    if (!navigator.geolocation) { alert('Geolocation wird von diesem Browser nicht unterstützt.'); return; }
-    const btn = document.getElementById('sm-gps');
-    btn.textContent = '📍 Wird ermittelt …';
-
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const { latitude: lat, longitude: lon } = pos.coords;
-        // Nächste Stadt bestimmen (Haversine vereinfacht)
-        function dist(c) {
-          const dlat = c.lat - lat, dlon = c.lon - lon;
-          return dlat*dlat + dlon*dlon;
-        }
-        const nearest = CITIES.reduce((a, b) => dist(a) < dist(b) ? a : b);
-        const loc = nearest.name.toLowerCase();
-        btn.textContent = '📍 Meinen Standort';
-        setLocation(loc);
-      },
-      err => {
-        btn.textContent = '📍 Meinen Standort';
-        alert('Standort konnte nicht ermittelt werden.');
-      },
-      { timeout: 8000 }
-    );
-  }
-
-  /* ── Impressum ──────────────────────────────────────── */
-  function showImpressum() {
-    document.getElementById('settings-menu').classList.remove('open');
-    document.getElementById('impressum-overlay').classList.add('open');
-  }
-
-  function closeImpressum() {
-    document.getElementById('impressum-overlay').classList.remove('open');
-  }
-
-  /* ══════════════════════════════════════════════════════
-     RANGE TOGGLE
-  ══════════════════════════════════════════════════════ */
-  function setRange(days) {
-    if (days === currentRange) return;
-    currentRange = days;
-    document.getElementById('btn1').classList.toggle('active', days === 1);
-    document.getElementById('btn3').classList.toggle('active', days === 3);
-    if (cachedData) {
-      updateTempData(cachedData, currentRange, true);
-      updateWindData(cachedData, currentRange, true);
-      if (marineCache) updateSeaData(marineCache, currentRange, true);
-    }
-  }
-
-  /* ══════════════════════════════════════════════════════
-     LOAD
-  ══════════════════════════════════════════════════════ */
-  async function loadAll(silent = false) {
-    setStatus('loading');
-    const [results, marineRaw] = await Promise.all([
-      Promise.allSettled(CITIES.map(c => fetchCity(c))),
-      fetchMarine().catch(() => null),
-    ]);
-    if (!results.every(r => r.status === 'fulfilled')) { setStatus('error'); return; }
-
-    const allData = results.map(r => r.value);
-    cachedData = allData;
-    if (marineRaw) marineCache = marineRaw;
-
-    if (!shellBuilt) {
-      buildShell(allData);
-      updateCards(allData);
-      requestAnimationFrame(() => {
-        initTempChart(allData, currentRange);
-        initWindChart(allData, currentRange);
-        if (marineCache) initSeaChart(marineCache, currentRange);
-        applyLocationFilter();
-      });
-    } else {
-      updateCards(allData);
-      updateTempData(allData, currentRange, false);
-      updateWindData(allData, currentRange, false);
-      if (marineCache) updateSeaData(marineCache, currentRange, false);
-    }
-
-    setStatus('ok');
-    document.getElementById('updated-text').textContent =
-      'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE');
-  }
-
-  function setStatus(s) {
-    document.getElementById('status-dot').className =
-      'status-dot' + (s === 'loading' ? ' loading' : '');
-  }
-
-  /* ══════════════════════════════════════════════════════
-     TIMER
-  ══════════════════════════════════════════════════════ */
-  const INTERVAL = 15;
-  const CIRCUMF  = 2 * Math.PI * 12; // r=12 ≈ 75.40
-
-  let remaining = INTERVAL, paused = false;
-  const ringEl   = document.getElementById('ring-progress');
-  const numEl    = document.getElementById('countdown-num');
-  const pauseBtn = document.getElementById('pause-btn');
-
-  function setRing(s) {
-    ringEl.style.strokeDashoffset = CIRCUMF * (1 - s / INTERVAL);
-    numEl.textContent = s;
-  }
-
-  function tick() {
-    if (paused) return;
-    remaining--;
-    setRing(remaining);
-    if (remaining <= 0) { remaining = INTERVAL; setRing(remaining); loadAll(true); }
-  }
-
-  function togglePause() {
-    paused = !paused;
-    pauseBtn.textContent      = paused ? 'Weiter' : 'Pause';
-    pauseBtn.style.background = paused ? 'rgba(255,184,48,0.20)' : '';
-  }
-
-  function manualRefresh() { remaining = INTERVAL; setRing(remaining); loadAll(false); }
-
-  setRing(INTERVAL);
-  updateMenuActive();
-  loadAll(false);
-  setInterval(tick, 1000);
-</script>
+<!-- Entry Point as Module -->
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
