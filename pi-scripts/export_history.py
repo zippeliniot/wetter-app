@@ -3,10 +3,12 @@
 
 Laeuft jaehrlich (01.01. 00:10) oder manuell.
 
-  SW40  : sensor.seewasser_temp_101_40cm  (neu, ab ~Jul 2025)
-          + sensor.temperature_sensor_101_40_cm_temperature  (alt, ab Jun 2023)
-          -> beide Measurements zusammengefuehrt (union)
-  SWGR  : sensor.seewasser_temp_102_grund_2  (ab erstem verfuegbaren Datum)
+Beide Logiksensoren werden per union() ueber ihre Measurement-Varianten
+zusammengefuehrt (SENSOR_MEASUREMENTS in climac_sftp.py):
+  SW40  : temperature_sensor_101_40_cm_temperature (alt) + seewasser_temp_101_40cm (neu)
+          -> ab 2023-06-01
+  SWGR  : temperature_sensor_102_grund_temperature (alt) + seewasser_temp_102_grund*
+          -> ab erstem verfuegbaren Datum (weiter Startpunkt, leere Jahre entfallen)
 
 Gruppierung: Jahr -> DOY (1..365), Tagesmittel.
 DOY-Referenzkurve + Sommer-Schwelle kommen aus SQLite.
@@ -24,21 +26,20 @@ from datetime import datetime
 
 from influxdb_client import InfluxDBClient
 
-from climac_sftp import DB_PATH, ClimacSFTP, get_influx_config
+from climac_sftp import DB_PATH, SENSOR_MEASUREMENTS, ClimacSFTP, get_influx_config
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(SCRIPT_DIR, "logs", "export_history.log")
 OUT_FILE = "/tmp/climac_history.json"
 REMOTE_NAME = "history.json"
 
+# SW40 laut Vorgabe ab 2023-06-01; SWGR "ab erstem verfuegbaren Datum" ->
+# weiter Startpunkt, Jahre ohne Daten tauchen im Ergebnis nicht auf.
 SW40_START = "2023-06-01T00:00:00Z"
-SWGR_START = "2019-01-01T00:00:00Z"
+SWGR_START = "2015-01-01T00:00:00Z"
 
-SW40_MEASUREMENTS = [
-    "sensor.seewasser_temp_101_40cm",
-    "sensor.temperature_sensor_101_40_cm_temperature",
-]
-SWGR_MEASUREMENTS = ["sensor.seewasser_temp_102_grund_2"]
+SW40_MEASUREMENTS = SENSOR_MEASUREMENTS["sw40"]
+SWGR_MEASUREMENTS = SENSOR_MEASUREMENTS["swgr"]
 
 ML_ROLE = "sea_water"
 DEFAULT_SUMMER_THRESHOLD = 18.0
@@ -137,8 +138,14 @@ def main() -> int:
         with open(OUT_FILE, "w") as fh:
             json.dump(payload, fh, separators=(",", ":"), allow_nan=False)
 
-        log.info("sw40 Jahre: %s", ", ".join(sw40) or "-")
-        log.info("swgr Jahre: %s", ", ".join(swgr) or "-")
+        def _summary(years: dict) -> str:
+            return ", ".join(
+                f"{y}:{sum(1 for v in vals if v is not None)}d"
+                for y, vals in years.items()
+            ) or "-"
+
+        log.info("sw40 %s", _summary(sw40))
+        log.info("swgr %s", _summary(swgr))
         log.info("geschrieben: %s (%d Bytes)", OUT_FILE, os.path.getsize(OUT_FILE))
 
         with ClimacSFTP() as s:
