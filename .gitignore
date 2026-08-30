@@ -1,0 +1,6 @@
+pi-scripts/logs/
+*.log
+/tmp/
+__pycache__/
+*.pyc
+.env
