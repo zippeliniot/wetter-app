@@ -156,6 +156,14 @@ class ClimacSFTP:
         self.sftp.put(local_path, remote_path)
         return remote_path
 
+    def upload_raw(self, local_path: str, remote_relpath: str) -> str:
+        """Datei relativ zum SFTP-Basispfad hochladen (z. B. 'js/main.js').
+        Fuer Web-Deploys ausserhalb von data/."""
+        remote_path = f"{self.base}/{remote_relpath.strip('/')}"
+        self._ensure_dir(remote_path.rsplit("/", 1)[0])
+        self.sftp.put(local_path, remote_path)
+        return remote_path
+
     def download_file(
         self, remote_filename: str, local_path: str, subdir: str | None = None
     ) -> bool:
