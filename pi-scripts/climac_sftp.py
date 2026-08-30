@@ -25,6 +25,30 @@ INFLUX_CRED_ID = "influx_v2_local"
 INFLUX_ORG = "home"
 INFLUX_BUCKET = "homeassistant"
 
+# Measurement-Gruppen je Logik-Sensor.
+# Bei Sensor-Umbenennungen laufen mehrere Measurements (teils parallel) --
+# fuer Tagesmittel/History werden sie per union() zusammengefuehrt.
+#   sw40 : Seewasser 40 cm Tiefe
+#   swgr : Seewasser Grund (Boden)
+#   at   : Aussentemperatur, ah : Aussenluftfeuchte
+#   bld  : Blitz-Entfernung, blt : letzter Blitz, bln : Blitzanzahl
+SENSOR_MEASUREMENTS = {
+    "sw40": [
+        "sensor.temperature_sensor_101_40_cm_temperature",  # alt, ab 2023-06
+        "sensor.seewasser_temp_101_40cm",                   # neu, ab 2025-07
+    ],
+    "swgr": [
+        "sensor.temperature_sensor_102_grund_temperature",  # alt, ab 2023-06
+        "sensor.seewasser_temp_102_grund",                  # zwischenzeitl. 2025-07..2026-03
+        "sensor.seewasser_temp_102_grund_2",                # neu, ab 2025-12
+    ],
+    "at": ["sensor.gw2000a_outdoor_temperature"],
+    "ah": ["sensor.gw2000a_humidity"],
+    "bld": ["sensor.gw2000a_lightning_strike_distance_3"],
+    "blt": ["sensor.gw2000a_last_lightning_strike_3"],
+    "bln": ["sensor.gw2000a_lightning_strikes_3"],
+}
+
 
 def get_credential(cred_id: str) -> dict:
     """Liest einen Credential-Datensatz aus SQLite. Eigene Verbindung,
