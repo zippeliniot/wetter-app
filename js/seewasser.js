@@ -9,6 +9,7 @@ const C_SW40 = '#00C8DC';
 const C_SWGR = '#66DD88';
 const C_REF  = 'rgba(255,255,255,0.35)';
 const C_THR  = 'rgba(255,184,48,0.55)';
+const C_AT   = 'rgba(255,184,48,0.8)';  // Lufttemperatur (gestrichelt)
 const GRID   = 'rgba(255,255,255,0.08)';
 const TICK   = 'rgba(255,255,255,0.85)';
 const MONTH_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -59,6 +60,7 @@ function monthRecords(j) {
     rec[row[0]] = {
       sw40: { min: g(row, 'sw40_min'), max: g(row, 'sw40_max'), mean: g(row, 'sw40_mean') },
       swgr: { min: g(row, 'swgr_min'), max: g(row, 'swgr_max'), mean: g(row, 'swgr_mean') },
+      at:   { min: g(row, 'at_min'),   max: g(row, 'at_max'),   mean: g(row, 'at_mean') },
     };
   }
   return rec;
@@ -134,6 +136,21 @@ function band(hi, lo, color) {
     { label: '_min', data: lo, borderColor: 'transparent', borderWidth: 0, pointRadius: 0, fill: '-1', backgroundColor: hexA(color, 0.10), tension: 0.3, spanGaps: true },
   ];
 }
+// Lufttemperatur: gestrichelte duenne Linie. data ggf. leer (history.json hat noch kein "at").
+function atLine(data) {
+  return {
+    label: 'Luft', data, borderColor: C_AT, backgroundColor: C_AT,
+    borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 3,
+    tension: 0.3, fill: false, spanGaps: true,
+  };
+}
+// at-Tagesmittel aus den (bereits geladenen) Monats-Records fuer eine Datums-Reihe.
+function getAtData(dates, recs) {
+  return dates.map((dt) => {
+    const r = (recs[ym(dt)] || {})[dt.getDate()];
+    return r && r.at ? r.at.mean : null;
+  });
+}
 
 async function cfgDailyWindow(nDays, withBand) {
   const today = new Date();
@@ -141,10 +158,11 @@ async function cfgDailyWindow(nDays, withBand) {
   for (const k of new Set([ym(today), shiftYm(ym(today), -1)])) {
     try { recs[k] = monthRecords(await loadMonth(k)); } catch (e) { /* Monat evtl. noch nicht da */ }
   }
-  const labels = [], sw40m = [], swgrm = [], lo = [], hi = [];
+  const dates = [], labels = [], sw40m = [], swgrm = [], lo = [], hi = [];
   for (let i = nDays - 1; i >= 0; i--) {
     const dt = new Date(today); dt.setDate(today.getDate() - i);
     const r = (recs[ym(dt)] || {})[dt.getDate()];
+    dates.push(dt);
     labels.push(`${DOW[dt.getDay()]} ${dt.getDate()}.${dt.getMonth() + 1}.`);
     sw40m.push(r ? r.sw40.mean : null);
     swgrm.push(r ? r.swgr.mean : null);
@@ -155,6 +173,7 @@ async function cfgDailyWindow(nDays, withBand) {
   if (withBand) ds.push(...band(hi, lo, C_SW40));
   ds.push(line('Taschensee 40 cm', sw40m, C_SW40, withBand ? {} : { fill: true, backgroundColor: hexA(C_SW40, 0.10) }));
   ds.push(line('Grund', swgrm, C_SWGR));
+  ds.push(atLine(getAtData(dates, recs)));
   const thr = (history && history.summer_threshold) || 18;
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(nDays <= 7 ? 7 : 8), thr, false), plugins: [thresholdPlugin] };
 }
@@ -163,16 +182,17 @@ async function cfgMonat() {
   const rec = monthRecords(await loadMonth(monthCursor));
   const [y, m] = monthCursor.split('-').map(Number);
   const dim = new Date(y, m, 0).getDate();
-  const labels = [], sw40m = [], swgrm = [], lo = [], hi = [];
+  const labels = [], sw40m = [], swgrm = [], atm = [], lo = [], hi = [];
   for (let d = 1; d <= dim; d++) {
     const r = rec[d];
     labels.push(String(d));
     sw40m.push(r ? r.sw40.mean : null);
     swgrm.push(r ? r.swgr.mean : null);
+    atm.push(r && r.at ? r.at.mean : null);
     lo.push(r ? r.sw40.min : null);
     hi.push(r ? r.sw40.max : null);
   }
-  const ds = [...band(hi, lo, C_SW40), line('Taschensee 40 cm', sw40m, C_SW40), line('Grund', swgrm, C_SWGR)];
+  const ds = [...band(hi, lo, C_SW40), line('Taschensee 40 cm', sw40m, C_SW40), line('Grund', swgrm, C_SWGR), atLine(atm)];
   const thr = (history && history.summer_threshold) || 18;
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(10), thr, false), plugins: [thresholdPlugin] };
 }
@@ -184,6 +204,8 @@ async function cfgJahr() {
   const ds = [
     line(`Taschensee 40 cm ${yr}`, (history.years.sw40 && history.years.sw40[yr]) || [], C_SW40),
     line(`Grund ${yr}`, (history.years.swgr && history.years.swgr[yr]) || [], C_SWGR),
+    // history.json hat aktuell kein "at" -> leeres Array; Linie erscheint, sobald export_history.py ergaenzt ist
+    atLine((history.years.at && history.years.at[yr]) || []),
     line('Referenz', history.ref || [], C_REF, { borderWidth: 1.5, borderDash: [5, 4] }),
   ];
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), history.summer_threshold || 18, true), plugins: [thresholdPlugin] };
@@ -200,6 +222,7 @@ async function cfgVergleich() {
     return line(k, years[k], `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${(0.30 + 0.65 * t).toFixed(2)})`,
       { borderWidth: i === keys.length - 1 ? 2.5 : 1.4 });
   });
+  ds.push(atLine((history.years.at && history.years.at[String(new Date().getFullYear())]) || []));
   ds.push(line('Referenz', history.ref || [], C_REF, { borderWidth: 1.5, borderDash: [5, 4] }));
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), history.summer_threshold || 18, true), plugins: [thresholdPlugin] };
 }
