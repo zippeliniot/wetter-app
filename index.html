@@ -83,6 +83,19 @@
     @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
     .modal-close { display: block; margin-top: 20px; width: 100%; padding: 10px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.10); color: #fff; font-size: 0.88rem; cursor: pointer; transition: background 0.18s; }
     .modal-close:hover { background: rgba(255,255,255,0.22); }
+    /* --- Taschensee-Karte --- */
+    .sw-tabs { flex-wrap: wrap; gap: 3px; }
+    .sw-tabs .range-btn { padding: 6px 14px; font-size: 0.8rem; letter-spacing: 0.5px; }
+    .sw-subctrl { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px 0 2px; font-size: 0.82rem; opacity: 0.88; min-height: 20px; }
+    .sw-subctrl button { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.20); color: #fff; border-radius: 50px; padding: 4px 13px; cursor: pointer; font-size: 0.82rem; }
+    .sw-subctrl button:disabled { opacity: 0.3; cursor: default; }
+    /* --- Blitz-Karte --- */
+    .bz-body { display: flex; flex-direction: column; margin-top: 6px; }
+    .bz-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .bz-row:last-child { border-bottom: none; }
+    .bz-k { font-size: 0.8rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.6px; }
+    .bz-v { font-size: 1.1rem; font-weight: 700; }
+    .bz-empty { text-align: center; opacity: 0.7; padding: 16px 0; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -136,12 +149,35 @@
     <div class="chart-wrapper" style="height: 240px;"><canvas id="wind-chart"></canvas></div>
   </div>
 
+  <div class="card" id="taschensee-card">
+    <div class="chart-head">
+      <span class="card-title" onclick="window.openFS('seewasser')">Taschensee · Gronenberg ↗</span>
+      <span id="sw-current" style="font-size:1.05rem;font-weight:700;opacity:0.9;"></span>
+    </div>
+    <div class="range-toggle sw-tabs" role="group" style="margin-bottom:4px;">
+      <button class="range-btn active" data-tab="aktuell"   onclick="window.swSetTab('aktuell')">Aktuell</button>
+      <button class="range-btn"        data-tab="woche"     onclick="window.swSetTab('woche')">Woche</button>
+      <button class="range-btn"        data-tab="monat"     onclick="window.swSetTab('monat')">Monat</button>
+      <button class="range-btn"        data-tab="jahr"      onclick="window.swSetTab('jahr')">Jahr</button>
+      <button class="range-btn"        data-tab="vergleich" onclick="window.swSetTab('vergleich')">Vergleich</button>
+    </div>
+    <div class="sw-subctrl" id="sw-subctrl"></div>
+    <div class="chart-wrapper" style="height: 280px;"><canvas id="sw-chart"></canvas></div>
+  </div>
+
   <div class="card" id="sea-card">
     <div class="chart-head">
       <span class="card-title" onclick="window.openFS('sea')">Ostsee · Scharbeutz ↗</span>
       <span id="sea-current" style="font-size:1.05rem;font-weight:700;opacity:0.9;"></span>
     </div>
     <div class="chart-wrapper" style="height: 220px;"><canvas id="sea-chart"></canvas></div>
+  </div>
+
+  <div class="card" id="blitz-card">
+    <div class="chart-head">
+      <span class="card-title">Blitzsituation · Gronenberg</span>
+    </div>
+    <div id="blitz-body" class="bz-body"></div>
   </div>
 
   <div class="card">
