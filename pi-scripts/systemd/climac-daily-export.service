@@ -1,0 +1,10 @@
+[Unit]
+Description=CLIMAC Wetter-App: Tages-Export (min/max/mittel gestern -> Monatsdatei SFTP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mp01
+WorkingDirectory=/opt/climac/web/wetter-app/pi-scripts
+ExecStart=/usr/bin/python3 /opt/climac/web/wetter-app/pi-scripts/export_daily.py

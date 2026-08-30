@@ -1,0 +1,9 @@
+[Unit]
+Description=CLIMAC Wetter-App: Live-Export alle 15 Minuten
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target
