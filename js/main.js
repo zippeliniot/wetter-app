@@ -3,6 +3,8 @@ import * as api from './api.js';
 import * as ui from './ui.js';
 import * as utils from './utils.js';
 import * as charts from './charts.js';
+import * as seewasser from './seewasser.js';
+import * as blitz from './blitz.js';
 
 // --- STATE ---
 let currentRange = 1;
@@ -174,6 +176,12 @@ function applyLocationFilter() {
     // Wind Karte (nur GR)
     document.getElementById('wind-card').style.display = showGR ? '' : 'none';
 
+    // Taschensee + Blitz (nur GR)
+    const _sw = document.getElementById('taschensee-card');
+    if (_sw) _sw.style.display = showGR ? '' : 'none';
+    const _bz = document.getElementById('blitz-card');
+    if (_bz) _bz.style.display = showGR ? '' : 'none';
+
     // Tabelle
     document.querySelectorAll('.fc-row-0, .fc-row-sep').forEach(el => el.style.display = showHH ? '' : 'none');
     document.querySelectorAll('.fc-row-1').forEach(el => el.style.display = showGR ? '' : 'none');
@@ -223,6 +231,11 @@ window.openFS = (type) => {
     } else if (type === 'wind') {
       title.textContent = "Windgeschwindigkeit Gronenberg";
       config = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'fs-canvas');
+    } else if (type === 'seewasser') {
+      const c = seewasser.getFSConfig();
+      if (!c) return;
+      title.textContent = "Taschensee Gronenberg";
+      config = c;
     } else {
       title.textContent = "Ostsee Wassertemperatur";
       config = charts.getSeaChartConfig(marineCache, currentRange, CITIES, 'fs-canvas');
@@ -245,6 +258,8 @@ window.closeFS = () => {
 window.manualRefresh = () => {
     remaining = 15;
     loadAll(false);
+    seewasser.refreshLive();
+    blitz.refresh();
 };
 
 window.togglePause = () => {
@@ -295,4 +310,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // 2. Dann echte Daten vom Server holen (Hintergrund-Update)
     loadAll(true);
+
+    // 3. Taschensee- + Blitz-Karte (unabhaengig von der Open-Meteo-Schleife)
+    seewasser.initSeewasser();
+    blitz.initBlitz();
 });
