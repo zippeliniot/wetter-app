@@ -91,7 +91,7 @@ function baseOptions(xScale, doyTooltip) {
       y: { ticks: { color: TICK, font: { size: 11 }, callback: (v) => v + '°' }, grid: { color: GRID } },
     },
     animation: { duration: 350 },
-    layout: { padding: { top: 24, left: 0, right: 0 } },
+    layout: { padding: { top: 12, left: 0, right: 0 } },
   };
 }
 const dailyX = (maxTicks) => ({
