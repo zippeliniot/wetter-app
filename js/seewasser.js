@@ -277,12 +277,27 @@ async function render() {
   lastCfg = cfg;
 }
 
+// Alter (Minuten) -> Kurz-Suffix fuer die Kopfzeile. Leer wenn frisch (<60 Min).
+function fmtAge(age) {
+  if (age == null || age < 60) return '';
+  if (age < 120) return ' (1h)';
+  return ` (${Math.round(age / 60)}h)`;
+}
+
 function updateHeader() {
   const el = document.getElementById('sw-current');
   if (!el || !live) return;
   const p = [];
-  if (live.sw40 != null) p.push(`<span style="color:#00C8DC">${live.sw40}°</span>`);
-  if (live.swgr != null) p.push(`<span style="color:#66DD88">${live.swgr}°</span>`);
+  if (live.sw40 != null) {
+    const dim = live.sw40_age != null && live.sw40_age > 60;
+    const col = dim ? 'rgba(0,200,220,0.40)' : '#00C8DC';
+    p.push(`<span style="color:${col}">${live.sw40}°${fmtAge(live.sw40_age)}</span>`);
+  }
+  if (live.swgr != null) {
+    const dim = live.swgr_age != null && live.swgr_age > 60;
+    const col = dim ? 'rgba(102,221,136,0.40)' : '#66DD88';
+    p.push(`<span style="color:${col}">${live.swgr}°${fmtAge(live.swgr_age)}</span>`);
+  }
   if (live.at != null) {
     const ah = live.ah != null ? ` ${live.ah}%` : '';
     p.push(`<span style="color:rgba(255,184,48,0.9)">${live.at}°${ah}</span>`);
