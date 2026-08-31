@@ -147,6 +147,15 @@ async function cfgDailyWindow(nDays, withBand) {
     lo.push(r ? r.sw40.min : null);
     hi.push(r ? r.sw40.max : null);
   }
+  // Live-Fallback fuer heute (letzter Punkt)
+  // sw40/swgr aus live.json wenn Monatsdatei noch keinen heutigen Wert hat
+  if (live) {
+    const last = sw40m.length - 1;
+    if (sw40m[last] == null && live.sw40 != null) sw40m[last] = live.sw40;
+    if (swgrm[last] == null && live.swgr != null) swgrm[last] = live.swgr;
+    // Band (hi/lo) auch fuellen wenn leer
+    if (lo[last] == null && live.sw40 != null) { lo[last] = live.sw40; hi[last] = live.sw40; }
+  }
   // Luft: Tagesmittel aus Monatsdateien fuer vergangene Tage, letzter Punkt (heute) = live.at
   const atData = getAtData(dates, recs);
   if (live && live.at != null) atData[atData.length - 1] = live.at;
