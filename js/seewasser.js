@@ -160,10 +160,13 @@ async function cfgHours(rangeh) {
   if (!hoursData) { try { await loadHours(); } catch (e) { /* Datei evtl. noch nicht da */ } }
   const rows = ((hoursData && hoursData.hours) || []).slice(-rangeh);
   const labels = rows.map((r) => r.t);
+  const atData = rows.map((r) => r.at);
+  // Luft: letzter Punkt = live.at (Momentanwert), analog cfgDailyWindow
+  if (live && live.at != null && atData.length) atData[atData.length - 1] = live.at;
   const ds = [
-    line('Taschensee 40 cm', rows.map((r) => r.sw40), C_SW40),
+    line('40 cm', rows.map((r) => r.sw40), C_SW40),
     line('Grund', rows.map((r) => r.swgr), C_SWGR),
-    atLine(rows.map((r) => r.at)),
+    atLine(atData),
   ];
   const opt = baseOptions(dailyHourX(rangeh <= 24 ? 12 : 8, labels), false);
   opt.plugins.tooltip.callbacks.title = (items) => {
@@ -207,7 +210,7 @@ async function cfgDailyWindow(nDays, withBand) {
   if (live && live.at != null) atData[atData.length - 1] = live.at;
   const ds = [];
   if (withBand) ds.push(...band(hi, lo, C_SW40));
-  ds.push(line('Taschensee 40 cm', sw40m, C_SW40, withBand ? {} : { fill: true, backgroundColor: hexA(C_SW40, 0.10) }));
+  ds.push(line('40 cm', sw40m, C_SW40, withBand ? {} : { fill: true, backgroundColor: hexA(C_SW40, 0.10) }));
   ds.push(line('Grund', swgrm, C_SWGR));
   ds.push(atLine(atData));
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(nDays), false) };
@@ -284,6 +287,26 @@ function buildConfig() {
 }
 
 function swChartWrap() { return document.querySelector('#taschensee-card .chart-wrapper'); }
+
+// Info-Text unter dem Chart (einmalig direkt nach .chart-wrapper eingefuegt).
+function ensureInfoText() {
+  if (document.getElementById('sw-info')) return;
+  const wrap = swChartWrap();
+  if (!wrap || !wrap.parentNode) return;
+  const p = document.createElement('p');
+  p.id = 'sw-info';
+  p.style.cssText = 'font-size:0.75rem;opacity:0.6;margin-top:8px;line-height:1.5;padding:0 4px;';
+  p.textContent =
+    'Seewassertemperatur Taschensee Gronenberg. '
+    + 'Sensor 40 cm: Tiefe 40 cm unter Wasseroberfläche. '
+    + 'Sensor Grund: Bodennahe Messung. '
+    + 'Luft: Aussentemperatur Messstation Gronenberg. '
+    + 'Aktuell/1Tag: Stundenwerte letzte 24h. '
+    + '3Tage: Stundenwerte letzte 72h. '
+    + 'Woche: Tagesmittel letzte 7 Tage. '
+    + 'Monat/Jahr/Vergleich: Historische Tagesmittel seit 2023.';
+  wrap.parentNode.insertBefore(p, wrap.nextSibling);
+}
 
 function renderSubctrl() {
   const el = document.getElementById('sw-subctrl');
@@ -427,6 +450,7 @@ export async function initSeewasser() {
   yearCursor = String(new Date().getFullYear());
   window._swRange = 1;
   hookRange();
+  ensureInfoText();
   loadHistory().catch((e) => console.warn('[seewasser] history.json:', e));
   loadHours().catch((e) => console.warn('[seewasser] hours.json:', e));
   await refreshLive();
