@@ -96,6 +96,44 @@ def query_years(client: InfluxDBClient, measurements: list[str], start: str) -> 
     return {y: per_year[y] for y in sorted(per_year)}
 
 
+def _flux_monthly(measurements: list[str], start: str, fn: str) -> str:
+    mfilter = " or ".join(f'r._measurement == "{m}"' for m in measurements)
+    return f'''
+import "date"
+import "timezone"
+option location = timezone.location(name: "Europe/Berlin")
+
+from(bucket: "{INFLUX["bucket"]}")
+  |> range(start: {start})
+  |> filter(fn: (r) => r._field == "value" and ({mfilter}))
+  |> group()
+  |> aggregateWindow(every: 1mo, fn: {fn}, createEmpty: false, timeSrc: "_start")
+  |> filter(fn: (r) => exists r._value)
+  |> map(fn: (r) => ({{ y: date.year(t: r._time), mo: date.month(t: r._time), v: r._value }}))
+  |> keep(columns: ["y", "mo", "v"])
+'''
+
+
+def query_months(client: InfluxDBClient, measurements: list[str], start: str) -> dict:
+    """-> { "2024": {"min":[12], "max":[12], "avg":[12]}, ... }  (null = kein Wert)"""
+    out: dict[str, dict] = {}
+    for fn, key in (("min", "min"), ("max", "max"), ("mean", "avg")):
+        tables = client.query_api().query(
+            _flux_monthly(measurements, start, fn), org=INFLUX["org"]
+        )
+        for table in tables:
+            for rec in table.records:
+                year = str(int(rec["y"]))
+                mo = int(rec["mo"])
+                if mo < 1 or mo > 12:
+                    continue
+                yd = out.setdefault(
+                    year, {"min": [None] * 12, "max": [None] * 12, "avg": [None] * 12}
+                )
+                yd[key][mo - 1] = round(float(rec["v"]), 2)
+    return {y: out[y] for y in sorted(out)}
+
+
 def load_reference() -> tuple[list, float]:
     conn = sqlite3.connect(DB_PATH)
     try:
@@ -133,12 +171,14 @@ def main() -> int:
             sw40 = query_years(client, SW40_MEASUREMENTS, SW40_START)
             swgr = query_years(client, SWGR_MEASUREMENTS, SWGR_START)
             at = query_years(client, AT_MEASUREMENTS, AT_START)
+            at_monthly = query_months(client, AT_MEASUREMENTS, AT_START)
 
         payload = {
             "updated": datetime.now().strftime("%Y-%m-%d"),
             "summer_threshold": summer_threshold,
             "ref": ref,
             "years": {"sw40": sw40, "swgr": swgr, "at": at},
+            "at_monthly": at_monthly,
         }
         with open(OUT_FILE, "w") as fh:
             json.dump(payload, fh, separators=(",", ":"), allow_nan=False)
@@ -152,6 +192,9 @@ def main() -> int:
         log.info("sw40 %s", _summary(sw40))
         log.info("swgr %s", _summary(swgr))
         log.info("at   %s", _summary(at))
+        log.info("at_monthly %s", ", ".join(
+            f"{y}:{sum(1 for v in md['min'] if v is not None)}mo"
+            for y, md in at_monthly.items()) or "-")
         log.info("geschrieben: %s (%d Bytes)", OUT_FILE, os.path.getsize(OUT_FILE))
 
         with ClimacSFTP() as s:

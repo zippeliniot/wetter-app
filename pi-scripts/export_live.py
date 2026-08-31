@@ -19,10 +19,12 @@ Ausgabe /tmp/climac_live.json  ->  Upload data/live.json
   {"t":"2026-08-30T12:00Z","sw40":20.5,"sw40_age":12,"swgr":20.9,"swgr_age":12,
    "at":19.8,"ah":83,"bld":null,"blt":null,"bln":null}
 
-Zusaetzlich stuendliche Zeitreihe (letzte 72 h, Mittelwerte):
+Zusaetzlich stuendliche Zeitreihe (letzte 72 h). sw40/swgr/ah je Stunde Mittel,
+Lufttemperatur zusaetzlich Min/Max je Stunde (at=avg, at_min, at_max):
   /tmp/climac_hours.json  ->  Upload data/hours.json
   {"updated":"2026-08-31T10:00Z",
-   "hours":[{"t":"2026-08-28T11:00Z","sw40":20.4,"swgr":20.8,"at":17.3,"ah":86}, ...]}
+   "hours":[{"t":"2026-08-28T11:00Z","sw40":20.4,"swgr":20.8,
+             "at":17.3,"at_min":16.1,"at_max":18.9,"ah":86}, ...]}
 """
 from __future__ import annotations
 
@@ -128,23 +130,23 @@ def query_live(client: InfluxDBClient) -> dict:
     return result
 
 
-def _hours_flux(measurements: list[str]) -> str:
+def _hours_flux(measurements: list[str], fn: str) -> str:
     mfilter = " or ".join(f'r._measurement == "{m}"' for m in measurements)
     return f'''
 from(bucket: "{INFLUX["bucket"]}")
   |> range(start: -{HOURS_SPAN + 1}h)
   |> filter(fn: (r) => r._field == "value" and ({mfilter}))
   |> group()
-  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false, timeSrc: "_start")
+  |> aggregateWindow(every: 1h, fn: {fn}, createEmpty: false, timeSrc: "_start")
   |> filter(fn: (r) => exists r._value)
   |> keep(columns: ["_time", "_value"])
 '''
 
 
-def _query_hourly(client: InfluxDBClient, measurements: list[str]) -> dict:
-    """-> {stunde_utc(datetime): wert(float,1)} — Stundenmittel ueber die Union."""
+def _query_hourly(client: InfluxDBClient, measurements: list[str], fn: str = "mean") -> dict:
+    """-> {stunde_utc(datetime): wert(float,1)} — Stunden-Aggregat ueber die Union."""
     out = {}
-    tables = client.query_api().query(_hours_flux(measurements), org=INFLUX["org"])
+    tables = client.query_api().query(_hours_flux(measurements, fn), org=INFLUX["org"])
     for table in tables:
         for rec in table.records:
             v = rec["_value"]
@@ -154,16 +156,24 @@ def _query_hourly(client: InfluxDBClient, measurements: list[str]) -> dict:
 
 
 def query_hours(client: InfluxDBClient) -> list:
-    """Stuendliche Zeitreihe der letzten HOURS_SPAN vollen Stunden."""
+    """Stuendliche Zeitreihe der letzten HOURS_SPAN vollen Stunden.
+    Lufttemperatur zusaetzlich mit Min/Max je Stunde."""
     series = {k: _query_hourly(client, SENSOR_MEASUREMENTS[k]) for k in HOURS_KEYS}
+    at_min = _query_hourly(client, SENSOR_MEASUREMENTS["at"], "min")
+    at_max = _query_hourly(client, SENSOR_MEASUREMENTS["at"], "max")
     now_h = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     rows = []
     for i in range(HOURS_SPAN, 0, -1):
         t = now_h - timedelta(hours=i)
-        row = {"t": t.strftime("%Y-%m-%dT%H:%MZ")}
-        for k in HOURS_KEYS:
-            row[k] = series[k].get(t)
-        rows.append(row)
+        rows.append({
+            "t": t.strftime("%Y-%m-%dT%H:%MZ"),
+            "sw40": series["sw40"].get(t),
+            "swgr": series["swgr"].get(t),
+            "at": series["at"].get(t),
+            "at_min": at_min.get(t),
+            "at_max": at_max.get(t),
+            "ah": series["ah"].get(t),
+        })
     return rows
 
 
