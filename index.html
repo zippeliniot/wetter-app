@@ -41,6 +41,7 @@
     .cl-item { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; opacity: 0.95; }
     .cl-line { width: 16px; height: 2px; border-radius: 2px; }
     .cl-dash { width: 18px; height: 0; border-top: 2px dashed; opacity: 0.9; }
+    .cl-band { width: 16px; height: 9px; border-radius: 2px; background: rgba(255,184,48,0.18); border-top: 2px dashed rgba(255,184,48,0.6); border-bottom: 2px dashed rgba(255,184,48,0.6); }
     .wind-thr { display: flex; flex-wrap: wrap; gap: 6px 12px; }
     .wt-item { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; opacity: 0.95; }
     .wt-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
@@ -159,7 +160,8 @@
         <div class="sw-legend" id="sw-legend">
           <div class="cl-item"><div class="cl-line" style="background:#00C8DC;"></div><span style="color:#00C8DC;">40 cm</span></div>
           <div class="cl-item"><div class="cl-line" style="background:#66DD88;"></div><span style="color:#66DD88;">Grund</span></div>
-          <div class="cl-item"><div class="cl-dash" style="border-color:rgba(255,184,48,0.8);"></div><span style="color:rgba(255,184,48,0.8);">Luft</span></div>
+          <div class="cl-item"><div class="cl-band"></div><span style="color:rgba(255,184,48,0.9);">Luft min. / max.</span></div>
+          <div class="cl-item"><div class="cl-dash" style="border-color:rgba(255,184,48,0.45);border-top-style:dotted;"></div><span style="color:rgba(255,184,48,0.7);">Luft Ø</span></div>
         </div>
       </div>
     </div>

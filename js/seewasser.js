@@ -9,7 +9,9 @@ const DATA   = 'data/';
 const C_SW40 = '#00C8DC';
 const C_SWGR = '#66DD88';
 const C_REF  = 'rgba(255,255,255,0.35)';
-const C_AT   = 'rgba(255,184,48,0.8)';  // Lufttemperatur (gestrichelt)
+const C_AT_FILL = 'rgba(255,184,48,0.13)';  // Luft-Band Minimum..Maximum
+const C_AT_BND  = 'rgba(255,184,48,0.55)';  // Luft Min/Max Begrenzungslinien (gestrichelt)
+const C_AT_AVG  = 'rgba(255,184,48,0.40)';  // Luft Ø (dezente Mittellinie)
 const GRID   = 'rgba(255,255,255,0.08)';
 const TICK   = 'rgba(255,255,255,0.85)';
 const MONTH_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -140,20 +142,48 @@ function band(hi, lo, color) {
     { label: '_min', data: lo, borderColor: 'transparent', borderWidth: 0, pointRadius: 0, fill: '-1', backgroundColor: hexA(color, 0.10), tension: 0.3, spanGaps: true },
   ];
 }
-// Lufttemperatur: gestrichelte duenne Linie. data ggf. leer (history.json hat noch kein "at").
-function atLine(data) {
-  return {
-    label: 'Luft', data, borderColor: C_AT, backgroundColor: C_AT,
-    borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 3,
-    tension: 0.3, fill: false, spanGaps: true,
-  };
+// Lufttemperatur als Band: halbtransparente Fuellung Min..Max, orange gestrichelte
+// Begrenzungslinien (Luft min./Luft max.) und dezente Ø-Mittellinie (Luft Ø, optional).
+// minA/maxA/avgA sind gleich lang wie labels; avgA darf fehlen/leer sein.
+// opts (z.B. { tension: 0 }) fuer stufige Monats-/Jahresansichten.
+function atBand(minA, maxA, avgA, opts = {}) {
+  const base = { pointRadius: 0, fill: false, tension: 0.3, spanGaps: true, ...opts };
+  const ds = [
+    { ...base, label: '_atmax', data: maxA, borderColor: 'transparent', borderWidth: 0 },
+    { ...base, label: '_atmin', data: minA, borderColor: 'transparent', borderWidth: 0,
+      fill: '-1', backgroundColor: C_AT_FILL },
+    { ...base, label: 'Luft max.', data: maxA, borderColor: C_AT_BND, backgroundColor: C_AT_BND,
+      borderWidth: 1, borderDash: [4, 4], pointHoverRadius: 3 },
+    { ...base, label: 'Luft min.', data: minA, borderColor: C_AT_BND, backgroundColor: C_AT_BND,
+      borderWidth: 1, borderDash: [4, 4], pointHoverRadius: 3 },
+  ];
+  if (avgA && avgA.some((v) => v != null)) {
+    ds.push({ ...base, label: 'Luft Ø', data: avgA, borderColor: C_AT_AVG, backgroundColor: C_AT_AVG,
+      borderWidth: 1, borderDash: [1, 3], pointHoverRadius: 3 });
+  }
+  return ds;
 }
-// at-Tagesmittel aus den (bereits geladenen) Monats-Records fuer eine Datums-Reihe.
-function getAtData(dates, recs) {
-  return dates.map((dt) => {
-    const r = (recs[ym(dt)] || {})[dt.getDate()];
-    return r && r.at ? r.at.mean : null;
-  });
+// Luft-Min/Max/Ø aus den (bereits geladenen) Monats-Records fuer eine Datums-Reihe.
+function getAtSeries(dates, recs) {
+  const min = [], max = [], avg = [];
+  for (const dt of dates) {
+    const a = ((recs[ym(dt)] || {})[dt.getDate()] || {}).at || null;
+    min.push(a ? a.min : null);
+    max.push(a ? a.max : null);
+    avg.push(a ? a.mean : null);
+  }
+  return { min, max, avg };
+}
+// 12 Monatswerte -> 365-DOY-Array, Wert ueber den ganzen Monat konstant (Stufen).
+function monthlyToDoy(arr12) {
+  const out = new Array(365).fill(null);
+  if (!arr12) return out;
+  for (let m = 0; m < 12; m++) {
+    if (arr12[m] == null) continue;
+    const end = m < 11 ? DOY_M[m + 1] - 1 : 365;
+    for (let d = DOY_M[m] - 1; d < end; d++) out[d] = arr12[m];
+  }
+  return out;
 }
 
 // Stundengrafik aus data/hours.json — rangeh = 24 (1 Tag) oder 72 (3 Tage).
@@ -167,16 +197,19 @@ async function cfgHours(rangeh) {
 
   const sw40Data = rows.map((r) => r.sw40);
   const swgrData = rows.map((r) => r.swgr);
-  const atData = rows.map((r) => r.at);
+  const atAvg = rows.map((r) => r.at);
+  const atMin = rows.map((r) => (r.at_min != null ? r.at_min : r.at));
+  const atMax = rows.map((r) => (r.at_max != null ? r.at_max : r.at));
   // Momentanwerte aus live.json anhaengen (null wenn Sensor offline -> spanGaps ueberbrueckt)
+  const lv = live && live.at != null ? live.at : null;
   sw40Data.push(live && live.sw40 != null ? live.sw40 : null);
   swgrData.push(live && live.swgr != null ? live.swgr : null);
-  atData.push(live && live.at != null ? live.at : null);
+  atAvg.push(lv); atMin.push(lv); atMax.push(lv);
 
   const ds = [
     line('40 cm', sw40Data, C_SW40),
     line('Grund', swgrData, C_SWGR),
-    atLine(atData),
+    ...atBand(atMin, atMax, atAvg),
   ];
   const opt = baseOptions(dailyHourX(rangeh <= 24 ? 12 : 8, labels), false);
   opt.plugins.tooltip.callbacks.title = (items) => {
@@ -215,14 +248,19 @@ async function cfgDailyWindow(nDays, withBand) {
     // Band (hi/lo) auch fuellen wenn leer
     if (lo[last] == null && live.sw40 != null) { lo[last] = live.sw40; hi[last] = live.sw40; }
   }
-  // Luft: Tagesmittel aus Monatsdateien fuer vergangene Tage, letzter Punkt (heute) = live.at
-  const atData = getAtData(dates, recs);
-  if (live && live.at != null) atData[atData.length - 1] = live.at;
+  // Luft Min/Max/Ø aus Monatsdateien; letzter Punkt (heute) ggf. aus live.json
+  const at = getAtSeries(dates, recs);
+  if (live && live.at != null) {
+    const L = at.avg.length - 1;
+    if (at.min[L] == null) at.min[L] = live.at;
+    if (at.max[L] == null) at.max[L] = live.at;
+    at.avg[L] = live.at;
+  }
   const ds = [];
   if (withBand) ds.push(...band(hi, lo, C_SW40));
   ds.push(line('40 cm', sw40m, C_SW40, withBand ? {} : { fill: true, backgroundColor: hexA(C_SW40, 0.10) }));
   ds.push(line('Grund', swgrm, C_SWGR));
-  ds.push(atLine(atData));
+  ds.push(...atBand(at.min, at.max, at.avg));
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(nDays), false) };
 }
 
@@ -230,17 +268,20 @@ async function cfgMonat() {
   const rec = monthRecords(await loadMonth(monthCursor));
   const [y, m] = monthCursor.split('-').map(Number);
   const dim = new Date(y, m, 0).getDate();
-  const labels = [], sw40m = [], swgrm = [], atm = [], lo = [], hi = [];
+  const labels = [], sw40m = [], swgrm = [], atMin = [], atMax = [], atAvg = [], lo = [], hi = [];
   for (let d = 1; d <= dim; d++) {
     const r = rec[d];
     labels.push(String(d));
     sw40m.push(r ? r.sw40.mean : null);
     swgrm.push(r ? r.swgr.mean : null);
-    atm.push(r && r.at ? r.at.mean : null);
+    atMin.push(r && r.at ? r.at.min : null);
+    atMax.push(r && r.at ? r.at.max : null);
+    atAvg.push(r && r.at ? r.at.mean : null);
     lo.push(r ? r.sw40.min : null);
     hi.push(r ? r.sw40.max : null);
   }
-  const ds = [...band(hi, lo, C_SW40), line('Taschensee 40 cm', sw40m, C_SW40), line('Grund', swgrm, C_SWGR), atLine(atm)];
+  const ds = [...band(hi, lo, C_SW40), line('40 cm', sw40m, C_SW40), line('Grund', swgrm, C_SWGR),
+    ...atBand(atMin, atMax, atAvg)];
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(10), false) };
 }
 
@@ -261,12 +302,13 @@ async function cfgJahr(year) {
   const yr = String(year || resolveYear());
   yearCursor = yr;
   const labels = Array.from({ length: 365 }, (_, i) => i + 1);
+  const mm = (history.at_monthly && history.at_monthly[yr]) || null;
   const ds = [
     line(`Taschensee 40 cm ${yr}`, (history.years.sw40 && history.years.sw40[yr]) || [], C_SW40),
     line(`Grund ${yr}`, (history.years.swgr && history.years.swgr[yr]) || [], C_SWGR),
-    atLine((history.years.at && history.years.at[yr]) || []),
-    line('Referenz', history.ref || [], C_REF, { borderWidth: 1.5, borderDash: [5, 4] }),
   ];
+  if (mm) ds.push(...atBand(monthlyToDoy(mm.min), monthlyToDoy(mm.max), monthlyToDoy(mm.avg), { tension: 0 }));
+  ds.push(line('Referenz', history.ref || [], C_REF, { borderWidth: 1.5, borderDash: [5, 4] }));
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), true) };
 }
 
@@ -281,7 +323,9 @@ async function cfgVergleich() {
     return line(k, years[k], `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${(0.30 + 0.65 * t).toFixed(2)})`,
       { borderWidth: i === keys.length - 1 ? 2.5 : 1.4 });
   });
-  ds.push(atLine((history.years.at && history.years.at[String(new Date().getFullYear())]) || []));
+  const cy = String(new Date().getFullYear());
+  const mmv = (history.at_monthly && history.at_monthly[cy]) || null;
+  if (mmv) ds.push(...atBand(monthlyToDoy(mmv.min), monthlyToDoy(mmv.max), monthlyToDoy(mmv.avg), { tension: 0 }));
   ds.push(line('Referenz', history.ref || [], C_REF, { borderWidth: 1.5, borderDash: [5, 4] }));
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), true) };
 }
@@ -314,7 +358,8 @@ function ensureInfoText() {
     + 'Aktuell/1Tag: Stundenwerte letzte 24h. '
     + '3Tage: Stundenwerte letzte 72h. '
     + 'Woche: Tagesmittel letzte 7 Tage. '
-    + 'Monat/Jahr/Vergleich: Historische Tagesmittel seit 2023.';
+    + 'Monat/Jahr/Vergleich: Historische Tagesmittel seit 2023. '
+    + 'Luft: Band = Minimum–Maximum je Intervall (Stunde/Tag/Monat), Linie = Durchschnitt.';
   wrap.parentNode.insertBefore(p, wrap.nextSibling);
 }
 
