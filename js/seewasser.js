@@ -85,7 +85,7 @@ function baseOptions(xScale, doyTooltip) {
       },
     },
     scales: {
-      x: xScale,
+      x: { ...xScale, bounds: 'data', offset: false },
       y: { ticks: { color: TICK, font: { size: 11 }, callback: (v) => v + '°' }, grid: { color: GRID } },
     },
     animation: { duration: 350 },
@@ -135,9 +135,9 @@ async function cfgDailyWindow(nDays, withBand) {
   for (const k of new Set([ym(today), shiftYm(ym(today), -1), shiftYm(ym(today), -2)])) {
     try { recs[k] = monthRecords(await loadMonth(k)); } catch (e) { /* Monat evtl. noch nicht da */ }
   }
-  // nDays abgeschlossene Tage + heute (i=0)  ->  nDays+1 Punkte
+  // Tagesmittel der letzten nDays Tage (heute = letzter Punkt, i=0)
   const dates = [], labels = [], sw40m = [], swgrm = [], lo = [], hi = [];
-  for (let i = nDays; i >= 0; i--) {
+  for (let i = nDays - 1; i >= 0; i--) {
     const dt = new Date(today); dt.setDate(today.getDate() - i);
     const r = (recs[ym(dt)] || {})[dt.getDate()];
     dates.push(dt);
@@ -155,7 +155,7 @@ async function cfgDailyWindow(nDays, withBand) {
   ds.push(line('Taschensee 40 cm', sw40m, C_SW40, withBand ? {} : { fill: true, backgroundColor: hexA(C_SW40, 0.10) }));
   ds.push(line('Grund', swgrm, C_SWGR));
   ds.push(atLine(atData));
-  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(nDays <= 7 ? 8 : 10), false) };
+  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(nDays), false) };
 }
 
 async function cfgMonat() {
@@ -224,7 +224,7 @@ function buildConfig() {
   if (activeTab === 'monat')     return cfgMonat();
   if (activeTab === 'jahr')      return cfgJahr(yearCursor);
   if (activeTab === 'vergleich') return cfgVergleich();
-  return cfgDailyWindow(14, false); // aktuell
+  return cfgDailyWindow(3, false); // aktuell — letzte 3 Tage Tagesmittel
 }
 
 function renderSubctrl() {
@@ -250,12 +250,8 @@ function renderSubctrl() {
   } else if (activeTab === 'vergleich') {
     const b = (k, l) => `<button onclick="window.swCmp('${k}')" style="${k === cmpSensor ? 'background:rgba(255,255,255,0.22);' : ''}">${l}</button>`;
     el.innerHTML = b('sw40', '40 cm') + b('swgr', 'Grund');
-  } else if (activeTab === 'aktuell' && live) {
-    const bits = [];
-    if (live.at != null) bits.push(`Luft ${live.at}°`);
-    if (live.ah != null) bits.push(`${live.ah} %`);
-    el.innerHTML = bits.length ? `<span>${bits.join(' · ')}</span>` : '';
   } else {
+    // aktuell: Luft+Feuchte steht bereits in #sw-current (updateHeader)
     el.innerHTML = '';
   }
 }
