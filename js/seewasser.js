@@ -233,7 +233,43 @@ function buildConfig() {
   if (activeTab === 'monat')     return cfgMonat();
   if (activeTab === 'jahr')      return cfgJahr(yearCursor);
   if (activeTab === 'vergleich') return cfgVergleich();
-  return cfgDailyWindow(3, false); // aktuell — letzte 3 Tage Tagesmittel
+  return cfgDailyWindow(window._swRange || 1, false); // aktuell — 1 oder 3 Tage (Range-Schalter)
+}
+
+// ---------- 1-Tag: Sofortanzeige (grosse Zahlen statt Chart) ----------
+// #sw-now wird dynamisch nach der .chart-wrapper angelegt (kein index.html-Eingriff).
+function swNowEl() {
+  let el = document.getElementById('sw-now');
+  if (!el) {
+    const wrap = document.querySelector('#taschensee-card .chart-wrapper');
+    if (!wrap || !wrap.parentNode) return null;
+    el = document.createElement('div');
+    el.id = 'sw-now';
+    el.style.display = 'none';
+    wrap.parentNode.insertBefore(el, wrap.nextSibling);
+  }
+  return el;
+}
+function swChartWrap() { return document.querySelector('#taschensee-card .chart-wrapper'); }
+
+function renderNow() {
+  const el = swNowEl();
+  if (!el) return;
+  const row = (val, age, label, hex) => {
+    if (val == null) return '';
+    const dim = age != null && age > 60;
+    const col = dim ? hexA(hex, 0.45) : hex;
+    return `<div style="font-size:2.5rem;line-height:1.15;color:${col};">${val}°${fmtAge(age)}</div>`
+      + `<div style="font-size:1rem;opacity:0.7;margin-bottom:16px;">${label}</div>`;
+  };
+  let html = row(live.sw40, live.sw40_age, '40 cm Tiefe', C_SW40)
+    + row(live.swgr, live.swgr_age, 'Grund', C_SWGR);
+  if (live.at != null) {
+    const ah = live.ah != null ? ` · ${live.ah}%` : '';
+    html += `<div style="font-size:1.6rem;line-height:1.15;color:rgba(255,184,48,0.9);">${live.at}°${ah}</div>`
+      + `<div style="font-size:1rem;opacity:0.7;">Luft</div>`;
+  }
+  el.innerHTML = `<div style="text-align:center;padding:36px 0;">${html || '<div style="opacity:0.6;">keine Live-Daten</div>'}</div>`;
 }
 
 function renderSubctrl() {
@@ -267,6 +303,20 @@ function renderSubctrl() {
 
 async function render() {
   renderSubctrl();
+  const wrap = swChartWrap();
+  const nowEl = swNowEl();
+
+  // 1-Tag + Tab Aktuell -> keine Chart, nur grosse Zahlen
+  if (activeTab === 'aktuell' && (window._swRange || 1) === 1 && live) {
+    if (chart) { chart.destroy(); chart = null; }
+    if (wrap) wrap.style.display = 'none';
+    if (nowEl) nowEl.style.display = 'block';
+    renderNow();
+    return;
+  }
+  if (wrap) wrap.style.display = '';
+  if (nowEl) nowEl.style.display = 'none';
+
   let cfg;
   try { cfg = await buildConfig(); }
   catch (e) { console.error('[seewasser]', e); showToast('Taschensee-Daten nicht verfügbar.'); return; }
@@ -350,10 +400,25 @@ export function getFSConfig() {
   };
 }
 
+// ---------- Range-Schalter (1 Tag / 3 Tage) aus main.js mitnutzen ----------
+function hookRange() {
+  if (window._swRangeHooked) return;
+  window._swRangeHooked = true;
+  window._swRange = window._swRange || 1;
+  const orig = window.setRange;
+  window.setRange = (n) => {
+    window._swRange = n;
+    if (typeof orig === 'function') orig(n);
+    if (activeTab === 'aktuell') render();
+  };
+}
+
 // ---------- init (aus main.js aufgerufen) ----------
 export async function initSeewasser() {
   monthCursor = ym(new Date());
   yearCursor = String(new Date().getFullYear());
+  window._swRange = 1;
+  hookRange();
   loadHistory().catch((e) => console.warn('[seewasser] history.json:', e));
   await refreshLive();
   render();
