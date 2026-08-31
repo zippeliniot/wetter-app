@@ -1,5 +1,6 @@
 // js/seewasser.js — Taschensee-Karte (Seewassertemperatur Gronenberg)
-// Quellen: data/live.json (15 Min), data/history.json (1x), data/months/YYYY-MM.json (on-demand)
+// Quellen: data/live.json (15 Min), data/hours.json (72h stuendlich, 15 Min),
+//          data/history.json (1x), data/months/YYYY-MM.json (on-demand)
 // Kein Eingriff in bestehende Module — nur Import von showToast aus ui.js.
 
 import { showToast } from './ui.js';
@@ -16,7 +17,7 @@ const DOW    = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const DOY_M  = [1,32,60,91,121,152,182,213,244,274,305,335]; // DOY am Monatsersten (Nicht-Schaltjahr)
 const FIRST_MONTH = '2023-06';
 
-let history = null, live = null;
+let history = null, live = null, hoursData = null;
 const monthCache = new Map();
 let activeTab = 'aktuell', cmpSensor = 'sw40', monthCursor = null, yearCursor = null;
 let chart = null, lastCfg = null, liveTimer = null;
@@ -29,6 +30,7 @@ async function getJSON(url) {
 }
 async function loadHistory() { if (!history) history = await getJSON(DATA + 'history.json'); return history; }
 async function loadLive()    { live = await getJSON(DATA + 'live.json'); return live; }
+async function loadHours()   { hoursData = await getJSON(DATA + 'hours.json'); return hoursData; }
 async function loadMonth(key) {
   if (monthCache.has(key)) return monthCache.get(key);
   const j = await getJSON(`${DATA}months/${key}.json`);
@@ -103,6 +105,30 @@ const doyX = () => ({
   },
   grid: { color: (ctx) => (DOY_M.includes(ctx.index + 1) ? 'rgba(255,255,255,0.20)' : 'rgba(255,255,255,0)') },
 });
+// Stunden-Achse: Labels sind ISO-Strings ("2026-08-28T08:00Z"). Anzeige in Lokalzeit,
+// "HH:00"; um Mitternacht zweizeilig "00:00 / DD.MM.". Gitterlinie an Mitternacht heller.
+const hourDate = (labels, i) => {
+  const d = new Date(labels && labels[i]);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+const dailyHourX = (maxTicks, labels) => ({
+  ticks: {
+    color: TICK, font: { size: 11 }, autoSkip: true, maxTicksLimit: maxTicks, maxRotation: 0,
+    callback(v) {
+      const d = hourDate(labels, v);
+      if (!d) return '';
+      return d.getHours() === 0
+        ? [`${pad2(0)}:00`, `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.`]
+        : `${pad2(d.getHours())}:00`;
+    },
+  },
+  grid: {
+    color: (ctx) => {
+      const d = hourDate(labels, ctx.index);
+      return d && d.getHours() === 0 ? 'rgba(255,255,255,0.20)' : GRID;
+    },
+  },
+});
 function line(label, data, color, extra = {}) {
   return { label, data, borderColor: color, backgroundColor: color,
     borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.3, fill: false, spanGaps: true, ...extra };
@@ -127,6 +153,26 @@ function getAtData(dates, recs) {
     const r = (recs[ym(dt)] || {})[dt.getDate()];
     return r && r.at ? r.at.mean : null;
   });
+}
+
+// Stundengrafik aus data/hours.json — rangeh = 24 (1 Tag) oder 72 (3 Tage).
+async function cfgHours(rangeh) {
+  if (!hoursData) { try { await loadHours(); } catch (e) { /* Datei evtl. noch nicht da */ } }
+  const rows = ((hoursData && hoursData.hours) || []).slice(-rangeh);
+  const labels = rows.map((r) => r.t);
+  const ds = [
+    line('Taschensee 40 cm', rows.map((r) => r.sw40), C_SW40),
+    line('Grund', rows.map((r) => r.swgr), C_SWGR),
+    atLine(rows.map((r) => r.at)),
+  ];
+  const opt = baseOptions(dailyHourX(rangeh <= 24 ? 12 : 8, labels), false);
+  opt.plugins.tooltip.callbacks.title = (items) => {
+    if (!items.length) return '';
+    const d = new Date(items[0].label);
+    if (Number.isNaN(d.getTime())) return items[0].label;
+    return `${DOW[d.getDay()]} ${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}. ${pad2(d.getHours())}:00`;
+  };
+  return { type: 'line', data: { labels, datasets: ds }, options: opt };
 }
 
 async function cfgDailyWindow(nDays, withBand) {
@@ -233,44 +279,11 @@ function buildConfig() {
   if (activeTab === 'monat')     return cfgMonat();
   if (activeTab === 'jahr')      return cfgJahr(yearCursor);
   if (activeTab === 'vergleich') return cfgVergleich();
-  return cfgDailyWindow(window._swRange || 1, false); // aktuell — 1 oder 3 Tage (Range-Schalter)
+  // aktuell: Stundengrafik — 1 Tag = 24 h, 3 Tage = 72 h
+  return cfgHours(window._swRange === 3 ? 72 : 24);
 }
 
-// ---------- 1-Tag: Sofortanzeige (grosse Zahlen statt Chart) ----------
-// #sw-now wird dynamisch nach der .chart-wrapper angelegt (kein index.html-Eingriff).
-function swNowEl() {
-  let el = document.getElementById('sw-now');
-  if (!el) {
-    const wrap = document.querySelector('#taschensee-card .chart-wrapper');
-    if (!wrap || !wrap.parentNode) return null;
-    el = document.createElement('div');
-    el.id = 'sw-now';
-    el.style.display = 'none';
-    wrap.parentNode.insertBefore(el, wrap.nextSibling);
-  }
-  return el;
-}
 function swChartWrap() { return document.querySelector('#taschensee-card .chart-wrapper'); }
-
-function renderNow() {
-  const el = swNowEl();
-  if (!el) return;
-  const row = (val, age, label, hex) => {
-    if (val == null) return '';
-    const dim = age != null && age > 60;
-    const col = dim ? hexA(hex, 0.45) : hex;
-    return `<div style="font-size:2.5rem;line-height:1.15;color:${col};">${val}°${fmtAge(age)}</div>`
-      + `<div style="font-size:1rem;opacity:0.7;margin-bottom:16px;">${label}</div>`;
-  };
-  let html = row(live.sw40, live.sw40_age, '40 cm Tiefe', C_SW40)
-    + row(live.swgr, live.swgr_age, 'Grund', C_SWGR);
-  if (live.at != null) {
-    const ah = live.ah != null ? ` · ${live.ah}%` : '';
-    html += `<div style="font-size:1.6rem;line-height:1.15;color:rgba(255,184,48,0.9);">${live.at}°${ah}</div>`
-      + `<div style="font-size:1rem;opacity:0.7;">Luft</div>`;
-  }
-  el.innerHTML = `<div style="text-align:center;padding:36px 0;">${html || '<div style="opacity:0.6;">keine Live-Daten</div>'}</div>`;
-}
 
 function renderSubctrl() {
   const el = document.getElementById('sw-subctrl');
@@ -304,16 +317,8 @@ function renderSubctrl() {
 async function render() {
   renderSubctrl();
   const wrap = swChartWrap();
-  const nowEl = swNowEl();
-
-  // 1-Tag + Tab Aktuell -> keine Chart, nur grosse Zahlen
-  if (activeTab === 'aktuell' && (window._swRange || 1) === 1 && live) {
-    if (chart) { chart.destroy(); chart = null; }
-    if (wrap) wrap.style.display = 'none';
-    if (nowEl) nowEl.style.display = 'block';
-    renderNow();
-    return;
-  }
+  const nowEl = document.getElementById('sw-now');
+  // Chart immer anzeigen; das alte #sw-now (Sofortanzeige) wird nicht mehr genutzt.
   if (wrap) wrap.style.display = '';
   if (nowEl) nowEl.style.display = 'none';
 
@@ -356,8 +361,11 @@ function updateHeader() {
 }
 
 async function refreshLive() {
-  try { await loadLive(); updateHeader(); if (activeTab === 'aktuell') render(); }
+  try { await loadLive(); updateHeader(); }
   catch (e) { console.warn('[seewasser] live.json:', e); }
+  try { await loadHours(); }
+  catch (e) { console.warn('[seewasser] hours.json:', e); }
+  if (activeTab === 'aktuell') render();
 }
 export { refreshLive };
 
@@ -420,6 +428,7 @@ export async function initSeewasser() {
   window._swRange = 1;
   hookRange();
   loadHistory().catch((e) => console.warn('[seewasser] history.json:', e));
+  loadHours().catch((e) => console.warn('[seewasser] hours.json:', e));
   await refreshLive();
   render();
   if (liveTimer) clearInterval(liveTimer);
