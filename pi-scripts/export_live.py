@@ -18,6 +18,11 @@ Werts, null wenn nichts gefunden).
 Ausgabe /tmp/climac_live.json  ->  Upload data/live.json
   {"t":"2026-08-30T12:00Z","sw40":20.5,"sw40_age":12,"swgr":20.9,"swgr_age":12,
    "at":19.8,"ah":83,"bld":null,"blt":null,"bln":null}
+
+Zusaetzlich stuendliche Zeitreihe (letzte 72 h, Mittelwerte):
+  /tmp/climac_hours.json  ->  Upload data/hours.json
+  {"updated":"2026-08-31T10:00Z",
+   "hours":[{"t":"2026-08-28T11:00Z","sw40":20.4,"swgr":20.8,"at":17.3,"ah":86}, ...]}
 """
 from __future__ import annotations
 
@@ -25,16 +30,20 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from influxdb_client import InfluxDBClient
 
-from climac_sftp import ClimacSFTP, get_influx_config
+from climac_sftp import SENSOR_MEASUREMENTS, ClimacSFTP, get_influx_config
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(SCRIPT_DIR, "logs", "export_live.log")
 OUT_FILE = "/tmp/climac_live.json"
 REMOTE_NAME = "live.json"
+HOURS_OUT_FILE = "/tmp/climac_hours.json"
+HOURS_REMOTE_NAME = "hours.json"
+HOURS_KEYS = ("sw40", "swgr", "at", "ah")  # stuendliche Zeitreihe
+HOURS_SPAN = 72
 
 # key -> config
 #   m     : Measurement-Namen (Union; juengster Punkt gewinnt)
@@ -119,6 +128,45 @@ def query_live(client: InfluxDBClient) -> dict:
     return result
 
 
+def _hours_flux(measurements: list[str]) -> str:
+    mfilter = " or ".join(f'r._measurement == "{m}"' for m in measurements)
+    return f'''
+from(bucket: "{INFLUX["bucket"]}")
+  |> range(start: -{HOURS_SPAN + 1}h)
+  |> filter(fn: (r) => r._field == "value" and ({mfilter}))
+  |> group()
+  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false, timeSrc: "_start")
+  |> filter(fn: (r) => exists r._value)
+  |> keep(columns: ["_time", "_value"])
+'''
+
+
+def _query_hourly(client: InfluxDBClient, measurements: list[str]) -> dict:
+    """-> {stunde_utc(datetime): wert(float,1)} — Stundenmittel ueber die Union."""
+    out = {}
+    tables = client.query_api().query(_hours_flux(measurements), org=INFLUX["org"])
+    for table in tables:
+        for rec in table.records:
+            v = rec["_value"]
+            if v is not None:
+                out[rec["_time"]] = round(float(v), 1)
+    return out
+
+
+def query_hours(client: InfluxDBClient) -> list:
+    """Stuendliche Zeitreihe der letzten HOURS_SPAN vollen Stunden."""
+    series = {k: _query_hourly(client, SENSOR_MEASUREMENTS[k]) for k in HOURS_KEYS}
+    now_h = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    rows = []
+    for i in range(HOURS_SPAN, 0, -1):
+        t = now_h - timedelta(hours=i)
+        row = {"t": t.strftime("%Y-%m-%dT%H:%MZ")}
+        for k in HOURS_KEYS:
+            row[k] = series[k].get(t)
+        rows.append(row)
+    return rows
+
+
 def main() -> int:
     setup_logging()
     log.info("=== export_live start ===")
@@ -126,6 +174,11 @@ def main() -> int:
         with InfluxDBClient(url=INFLUX["url"], token=INFLUX["token"],
                             org=INFLUX["org"], timeout=60_000) as client:
             values = query_live(client)
+            try:
+                hours = query_hours(client)
+            except Exception:
+                log.exception("Stunden-Abfrage fehlgeschlagen — hours.json wird uebersprungen")
+                hours = []
 
         payload = {"t": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")}
         payload.update(values)
@@ -140,9 +193,22 @@ def main() -> int:
         log.info("vorhanden: %s / fehlend: %s",
                  ",".join(present) or "-", ",".join(missing) or "-")
 
+        if hours:
+            hours_payload = {
+                "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
+                "hours": hours,
+            }
+            with open(HOURS_OUT_FILE, "w") as fh:
+                json.dump(hours_payload, fh, separators=(",", ":"), allow_nan=False)
+            n_sw40 = sum(1 for h in hours if h["sw40"] is not None)
+            log.info("Stunden: %d Eintraege (%d mit sw40)", len(hours), n_sw40)
+
         with ClimacSFTP() as s:
             remote = s.upload_file(OUT_FILE, REMOTE_NAME)
-        log.info("Upload OK -> %s", remote)
+            log.info("Upload OK -> %s", remote)
+            if hours:
+                remote_h = s.upload_file(HOURS_OUT_FILE, HOURS_REMOTE_NAME)
+                log.info("Upload OK -> %s", remote_h)
         log.info("=== export_live done ===")
         return 0
     except Exception:
