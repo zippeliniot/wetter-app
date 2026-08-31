@@ -117,6 +117,7 @@ const dailyHourX = (maxTicks, labels) => ({
     callback(v) {
       const d = hourDate(labels, v);
       if (!d) return '';
+      if (labels && v === labels.length - 1) return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; // "jetzt"
       return d.getHours() === 0
         ? [`${pad2(0)}:00`, `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.`]
         : `${pad2(d.getHours())}:00`;
@@ -159,13 +160,22 @@ function getAtData(dates, recs) {
 async function cfgHours(rangeh) {
   if (!hoursData) { try { await loadHours(); } catch (e) { /* Datei evtl. noch nicht da */ } }
   const rows = ((hoursData && hoursData.hours) || []).slice(-rangeh);
+
+  // ISO-Labels der Stundenpunkte + aktueller Zeitpunkt als zusaetzlicher letzter Punkt
   const labels = rows.map((r) => r.t);
+  labels.push(new Date().toISOString());
+
+  const sw40Data = rows.map((r) => r.sw40);
+  const swgrData = rows.map((r) => r.swgr);
   const atData = rows.map((r) => r.at);
-  // Luft: letzter Punkt = live.at (Momentanwert), analog cfgDailyWindow
-  if (live && live.at != null && atData.length) atData[atData.length - 1] = live.at;
+  // Momentanwerte aus live.json anhaengen (null wenn Sensor offline -> spanGaps ueberbrueckt)
+  sw40Data.push(live && live.sw40 != null ? live.sw40 : null);
+  swgrData.push(live && live.swgr != null ? live.swgr : null);
+  atData.push(live && live.at != null ? live.at : null);
+
   const ds = [
-    line('40 cm', rows.map((r) => r.sw40), C_SW40),
-    line('Grund', rows.map((r) => r.swgr), C_SWGR),
+    line('40 cm', sw40Data, C_SW40),
+    line('Grund', swgrData, C_SWGR),
     atLine(atData),
   ];
   const opt = baseOptions(dailyHourX(rangeh <= 24 ? 12 : 8, labels), false);
@@ -173,7 +183,7 @@ async function cfgHours(rangeh) {
     if (!items.length) return '';
     const d = new Date(items[0].label);
     if (Number.isNaN(d.getTime())) return items[0].label;
-    return `${DOW[d.getDay()]} ${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}. ${pad2(d.getHours())}:00`;
+    return `${DOW[d.getDay()]} ${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}. ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
   };
   return { type: 'line', data: { labels, datasets: ds }, options: opt };
 }
