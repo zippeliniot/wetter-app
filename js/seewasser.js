@@ -8,7 +8,6 @@ const DATA   = 'data/';
 const C_SW40 = '#00C8DC';
 const C_SWGR = '#66DD88';
 const C_REF  = 'rgba(255,255,255,0.35)';
-const C_THR  = 'rgba(255,184,48,0.55)';
 const C_AT   = 'rgba(255,184,48,0.8)';  // Lufttemperatur (gestrichelt)
 const GRID   = 'rgba(255,255,255,0.08)';
 const TICK   = 'rgba(255,255,255,0.85)';
@@ -19,7 +18,7 @@ const FIRST_MONTH = '2023-06';
 
 let history = null, live = null;
 const monthCache = new Map();
-let activeTab = 'aktuell', cmpSensor = 'sw40', monthCursor = null;
+let activeTab = 'aktuell', cmpSensor = 'sw40', monthCursor = null, yearCursor = null;
 let chart = null, lastCfg = null, liveTimer = null;
 
 // ---------- fetch ----------
@@ -70,35 +69,13 @@ const doyToLabel = (doy) => {
   return `${d.getDate()}. ${MONTH_SHORT[d.getMonth()]}`;
 };
 
-// ---------- 18°-Schwellen-Plugin ----------
-const thresholdPlugin = {
-  id: 'swThreshold',
-  afterDatasetsDraw(c) {
-    const cfg = c.options.plugins.swThreshold;
-    const thr = cfg && cfg.value;
-    if (thr == null) return;
-    const { ctx, chartArea: a, scales: { y } } = c;
-    if (!a || thr > y.max || thr < y.min) return;
-    const py = y.getPixelForValue(thr);
-    ctx.save();
-    ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.strokeStyle = C_THR;
-    ctx.beginPath(); ctx.moveTo(a.left, py); ctx.lineTo(a.right, py); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = C_THR; ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-    ctx.fillText(`${thr}° Sommer`, a.right - 4, py - 2);
-    ctx.restore();
-  },
-};
-
 // ---------- config-Bau ----------
-function baseOptions(xScale, thr, doyTooltip) {
+function baseOptions(xScale, doyTooltip) {
   return {
     responsive: true, maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
       legend: { display: false },
-      swThreshold: { value: thr },
       tooltip: {
         filter: (i) => i.dataset && i.dataset.label && !i.dataset.label.startsWith('_'),
         callbacks: {
@@ -155,11 +132,12 @@ function getAtData(dates, recs) {
 async function cfgDailyWindow(nDays, withBand) {
   const today = new Date();
   const recs = {};
-  for (const k of new Set([ym(today), shiftYm(ym(today), -1)])) {
+  for (const k of new Set([ym(today), shiftYm(ym(today), -1), shiftYm(ym(today), -2)])) {
     try { recs[k] = monthRecords(await loadMonth(k)); } catch (e) { /* Monat evtl. noch nicht da */ }
   }
+  // nDays abgeschlossene Tage + heute (i=0)  ->  nDays+1 Punkte
   const dates = [], labels = [], sw40m = [], swgrm = [], lo = [], hi = [];
-  for (let i = nDays - 1; i >= 0; i--) {
+  for (let i = nDays; i >= 0; i--) {
     const dt = new Date(today); dt.setDate(today.getDate() - i);
     const r = (recs[ym(dt)] || {})[dt.getDate()];
     dates.push(dt);
@@ -169,13 +147,15 @@ async function cfgDailyWindow(nDays, withBand) {
     lo.push(r ? r.sw40.min : null);
     hi.push(r ? r.sw40.max : null);
   }
+  // Luft: Tagesmittel aus Monatsdateien fuer vergangene Tage, letzter Punkt (heute) = live.at
+  const atData = getAtData(dates, recs);
+  if (live && live.at != null) atData[atData.length - 1] = live.at;
   const ds = [];
   if (withBand) ds.push(...band(hi, lo, C_SW40));
   ds.push(line('Taschensee 40 cm', sw40m, C_SW40, withBand ? {} : { fill: true, backgroundColor: hexA(C_SW40, 0.10) }));
   ds.push(line('Grund', swgrm, C_SWGR));
-  ds.push(atLine(getAtData(dates, recs)));
-  const thr = (history && history.summer_threshold) || 18;
-  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(nDays <= 7 ? 7 : 8), thr, false), plugins: [thresholdPlugin] };
+  ds.push(atLine(atData));
+  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(nDays <= 7 ? 8 : 10), false) };
 }
 
 async function cfgMonat() {
@@ -193,22 +173,33 @@ async function cfgMonat() {
     hi.push(r ? r.sw40.max : null);
   }
   const ds = [...band(hi, lo, C_SW40), line('Taschensee 40 cm', sw40m, C_SW40), line('Grund', swgrm, C_SWGR), atLine(atm)];
-  const thr = (history && history.summer_threshold) || 18;
-  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(10), thr, false), plugins: [thresholdPlugin] };
+  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(10), false) };
 }
 
-async function cfgJahr() {
+// Verfuegbare Jahre (mit Daten) — Basis sw40, sortiert aufsteigend.
+function swYears() {
+  const y = (history && history.years && history.years.sw40) ? Object.keys(history.years.sw40) : [];
+  return y.slice().sort();
+}
+// yearCursor auf ein Jahr mit Daten klemmen (Fallback: letztes verfuegbares / aktuelles Jahr).
+function resolveYear() {
+  const years = swYears();
+  if (years.includes(yearCursor)) return yearCursor;
+  return years.length ? years[years.length - 1] : String(new Date().getFullYear());
+}
+
+async function cfgJahr(year) {
   await loadHistory();
-  const yr = String(new Date().getFullYear());
+  const yr = String(year || resolveYear());
+  yearCursor = yr;
   const labels = Array.from({ length: 365 }, (_, i) => i + 1);
   const ds = [
     line(`Taschensee 40 cm ${yr}`, (history.years.sw40 && history.years.sw40[yr]) || [], C_SW40),
     line(`Grund ${yr}`, (history.years.swgr && history.years.swgr[yr]) || [], C_SWGR),
-    // history.json hat aktuell kein "at" -> leeres Array; Linie erscheint, sobald export_history.py ergaenzt ist
     atLine((history.years.at && history.years.at[yr]) || []),
     line('Referenz', history.ref || [], C_REF, { borderWidth: 1.5, borderDash: [5, 4] }),
   ];
-  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), history.summer_threshold || 18, true), plugins: [thresholdPlugin] };
+  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), true) };
 }
 
 async function cfgVergleich() {
@@ -224,14 +215,14 @@ async function cfgVergleich() {
   });
   ds.push(atLine((history.years.at && history.years.at[String(new Date().getFullYear())]) || []));
   ds.push(line('Referenz', history.ref || [], C_REF, { borderWidth: 1.5, borderDash: [5, 4] }));
-  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), history.summer_threshold || 18, true), plugins: [thresholdPlugin] };
+  return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), true) };
 }
 
 // ---------- render ----------
 function buildConfig() {
   if (activeTab === 'woche')     return cfgDailyWindow(7, true);
   if (activeTab === 'monat')     return cfgMonat();
-  if (activeTab === 'jahr')      return cfgJahr();
+  if (activeTab === 'jahr')      return cfgJahr(yearCursor);
   if (activeTab === 'vergleich') return cfgVergleich();
   return cfgDailyWindow(14, false); // aktuell
 }
@@ -246,6 +237,16 @@ function renderSubctrl() {
     el.innerHTML = `<button ${prevOff} onclick="window.swMonth(-1)">‹</button>`
       + `<span>${MONTH_SHORT[m - 1]} ${y}</span>`
       + `<button ${nextOff} onclick="window.swMonth(1)">›</button>`;
+  } else if (activeTab === 'jahr') {
+    const years = swYears();
+    const yr = resolveYear();
+    yearCursor = yr;
+    const i = years.indexOf(yr);
+    const prevOff = i <= 0 ? 'disabled' : '';
+    const nextOff = i < 0 || i >= years.length - 1 ? 'disabled' : '';
+    el.innerHTML = `<button ${prevOff} onclick="window.swYearDelta(-1)">‹</button>`
+      + `<span>${yr}</span>`
+      + `<button ${nextOff} onclick="window.swYearDelta(1)">›</button>`;
   } else if (activeTab === 'vergleich') {
     const b = (k, l) => `<button onclick="window.swCmp('${k}')" style="${k === cmpSensor ? 'background:rgba(255,255,255,0.22);' : ''}">${l}</button>`;
     el.innerHTML = b('sw40', '40 cm') + b('swgr', 'Grund');
@@ -275,9 +276,13 @@ function updateHeader() {
   const el = document.getElementById('sw-current');
   if (!el || !live) return;
   const p = [];
-  if (live.sw40 != null) p.push(`40 cm ${live.sw40}°`);
-  if (live.swgr != null) p.push(`Grund ${live.swgr}°`);
-  el.textContent = p.join('  ·  ');
+  if (live.sw40 != null) p.push(`<span style="color:#00C8DC">${live.sw40}°</span>`);
+  if (live.swgr != null) p.push(`<span style="color:#66DD88">${live.swgr}°</span>`);
+  if (live.at != null) {
+    const ah = live.ah != null ? ` ${live.ah}%` : '';
+    p.push(`<span style="color:rgba(255,184,48,0.9)">${live.at}°${ah}</span>`);
+  }
+  el.innerHTML = p.join(' · ');
 }
 
 async function refreshLive() {
@@ -300,6 +305,16 @@ window.swMonth = (delta) => {
   monthCursor = nx;
   render();
 };
+window.swYearDelta = (delta) => {
+  const years = swYears();
+  if (!years.length) return;
+  let i = years.indexOf(yearCursor);
+  if (i < 0) i = years.length - 1;
+  const ni = i + delta;
+  if (ni < 0 || ni >= years.length) return;
+  yearCursor = years[ni];
+  render();
+};
 window.swCmp = (k) => { if (k !== cmpSensor) { cmpSensor = k; render(); } };
 
 // ---------- Fullscreen (nutzt bestehendes #fs-modal via main.js) ----------
@@ -312,13 +327,13 @@ export function getFSConfig() {
     type: lastCfg.type,
     data,
     options: { ...lastCfg.options, plugins: { ...lastCfg.options.plugins }, scales: { ...lastCfg.options.scales } },
-    plugins: lastCfg.plugins,
   };
 }
 
 // ---------- init (aus main.js aufgerufen) ----------
 export async function initSeewasser() {
   monthCursor = ym(new Date());
+  yearCursor = String(new Date().getFullYear());
   loadHistory().catch((e) => console.warn('[seewasser] history.json:', e));
   await refreshLive();
   render();
