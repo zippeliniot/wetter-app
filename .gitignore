@@ -4,3 +4,6 @@ pi-scripts/logs/
 __pycache__/
 *.pyc
 .env
+
+# Mockup-Generatoren und -Bilder (Entwicklungsartefakte, nicht für Production)
+mockups/
