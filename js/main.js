@@ -18,6 +18,23 @@ let shellBuilt = false;
 const CACHE_KEY_CITY = 'wetter_city_cache';
 const CACHE_KEY_MARINE = 'wetter_marine_cache';
 
+// --- HILFSFUNKTIONEN ---
+
+/** Index der aktuell gewählten Stadt in CITIES (-1 bei 'all'). */
+function getCityIdx() {
+    return CITIES.findIndex(c => c.name.toLowerCase() === currentLocation);
+}
+
+/**
+ * Welche Stadt soll im Wind-Chart angezeigt werden?
+ * 'all' → Gronenberg (Index 1); Einzelstadt → deren Index; Fallback: 1.
+ */
+function getWindCityIdx() {
+    if (currentLocation === 'all') return 1;
+    const idx = getCityIdx();
+    return idx >= 0 ? idx : 1;
+}
+
 // --- APP LOGIC ---
 
 /**
@@ -31,6 +48,14 @@ async function loadFromCache() {
         console.log("Lade Daten aus Cache...");
         cachedData = JSON.parse(cityData);
         marineCache = JSON.parse(marineData);
+
+        // Wenn Cache noch aus alter 2-Städte-Version stammt → verwerfen
+        if (cachedData.length < CITIES.length) {
+            console.log("Cache veraltet (weniger Städte), lade neu...");
+            cachedData = null;
+            marineCache = null;
+            return;
+        }
 
         // 1. Shell bauen (falls noch nicht geschehen)
         if (!shellBuilt) {
@@ -64,8 +89,8 @@ async function loadAll(silent = false) {
         const allData = results.map(r => r.value);
 
         // Cache speichern
-        localStorage.setItem('wetter_city_cache', JSON.stringify(allData));
-        if (marineRaw) localStorage.setItem('wetter_marine_cache', JSON.stringify(marineRaw));
+        localStorage.setItem(CACHE_KEY_CITY, JSON.stringify(allData));
+        if (marineRaw) localStorage.setItem(CACHE_KEY_MARINE, JSON.stringify(marineRaw));
 
         cachedData = allData;
         marineCache = marineRaw;
@@ -91,7 +116,7 @@ async function loadAll(silent = false) {
 function initCharts() {
     requestAnimationFrame(() => {
         tempChart = new Chart(document.getElementById('temp-chart'), charts.getTempChartConfig(cachedData, currentRange, CITIES));
-        windChart = new Chart(document.getElementById('wind-chart'), charts.getWindChartConfig(cachedData, currentRange, CITIES));
+        windChart = new Chart(document.getElementById('wind-chart'), charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', getWindCityIdx()));
         if (marineCache) {
             seaChart = new Chart(document.getElementById('sea-chart'), charts.getSeaChartConfig(marineCache, currentRange, CITIES));
         }
@@ -106,11 +131,12 @@ function updateCharts() {
         tempChart.data = cfg.data;
         tempChart._isNight = cfg._isNight;
         tempChart._symEvery = cfg._symEvery;
+        tempChart._N = cfg._N;
         // Wichtig: 'none' verhindert Animationen beim Hintergrund-Update
         tempChart.update('none');
     }
     if (windChart) {
-        const cfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart');
+        const cfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', getWindCityIdx());
         windChart.data = cfg.data;
         windChart._isNight = cfg._isNight;
         windChart.update('none');
@@ -123,8 +149,7 @@ function updateCharts() {
         updateSeaHeader();
     }
 
-    // WICHTIG: Nach dem Update den Filter erneut anwenden,
-    // damit Hamburg/GR wieder korrekt ein-/ausgeblendet sind!
+    // WICHTIG: Nach dem Update den Filter erneut anwenden
     applyLocationFilter();
 }
 
@@ -149,73 +174,73 @@ function updateSeaHeader() {
 }
 
 function applyLocationFilter() {
-    // Kiel und Lübeck haben keine Wetter-Tabellendaten (nur Regen-Nowcast)
-    const regenOnly = currentLocation === 'kiel' || currentLocation === 'lübeck';
-    const showHH = !regenOnly && (currentLocation === 'hamburg' || currentLocation === 'all');
-    const showGR = !regenOnly && (currentLocation === 'gronenberg' || currentLocation === 'all');
+    const N = CITIES.length;          // 4
+    const cityIdx = getCityIdx();      // -1 wenn 'all'
+    const isAll = currentLocation === 'all';
 
-    // Hinweis-Card für regen-only Standorte
-    const notice = document.getElementById('no-weather-notice');
-    if (notice) notice.style.display = regenOnly ? '' : 'none';
-    if (regenOnly) {
-        const cityEl = document.getElementById('no-weather-city');
-        if (cityEl) cityEl.textContent = currentLocation.charAt(0).toUpperCase() + currentLocation.slice(1);
+    // --- Temp-Chart: Datasets ein-/ausblenden ---
+    // Struktur: [0..N-1] rainBars | [N..2N-1] rainDots | [2N..3N-1] tempLines
+    if (tempChart) {
+        for (let ci = 0; ci < N; ci++) {
+            const show = isAll ? (ci === 0 || ci === 1) : (ci === cityIdx);
+            tempChart.getDatasetMeta(ci).hidden      = !show; // rainBar
+            tempChart.getDatasetMeta(N + ci).hidden  = !show; // rainDot
+            tempChart.getDatasetMeta(2*N + ci).hidden = !show; // tempLine
+        }
+        tempChart.update('none');
     }
 
-    // Aktiven Menüeintrag markieren
+    // --- Wind-Chart: Daten der gewählten Stadt / bei 'all' → GR ---
+    // Wind-Chart wird neu befüllt (Daten und Titel)
+    if (windChart && cachedData) {
+        const wIdx = getWindCityIdx();
+        const windCfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', wIdx);
+        windChart.data = windCfg.data;
+        windChart._isNight = windCfg._isNight;
+        windChart.update('none');
+        // Titel der Wind-Card aktualisieren
+        const windTitleEl = document.getElementById('wind-card-title');
+        if (windTitleEl) windTitleEl.textContent = `Wind · ${CITIES[wIdx].name} km/h ↗`;
+    }
+    // Wind-Card: immer sichtbar (alle Städte haben Winddaten)
+    document.getElementById('wind-card').style.display = '';
+
+    // --- Taschensee + Blitz + Ostsee: nur bei GR oder 'all' ---
+    const showGRCards = isAll || currentLocation === 'gronenberg';
+    const _sw = document.getElementById('taschensee-card');
+    if (_sw) _sw.style.display = showGRCards ? '' : 'none';
+    const _bz = document.getElementById('blitz-card');
+    if (_bz) _bz.style.display = showGRCards ? '' : 'none';
+    const _sea = document.getElementById('sea-card');
+    if (_sea) _sea.style.display = showGRCards ? '' : 'none';
+
+    // --- Prognose-Tabelle ---
+    for (let ci = 0; ci < N; ci++) {
+        const show = isAll ? (ci === 0 || ci === 1) : (ci === cityIdx);
+        document.querySelectorAll(`.fc-row-${ci}`).forEach(el => el.style.display = show ? '' : 'none');
+    }
+    // Trennzeile zwischen HH und GR nur in 'all'-Modus
+    document.querySelectorAll('.fc-row-sep').forEach(el => el.style.display = isAll ? '' : 'none');
+
+    // --- Legende ---
+    // Schlüssel: hh=0, gr=1, ki=2, lü=3
+    const LEG_KEYS = ['hh', 'gr', 'ki', 'lü'];
+    LEG_KEYS.forEach((key, ci) => {
+        const show = isAll ? (ci === 0 || ci === 1) : (ci === cityIdx);
+        const toggleLeg = (id) => { const el = document.getElementById(id); if (el) el.style.display = show ? '' : 'none'; };
+        toggleLeg(`leg-${key}-temp`);
+        toggleLeg(`leg-${key}-rain`);
+    });
+
+    // --- Hinweis-Card (nicht mehr benötigt, immer ausblenden) ---
+    const notice = document.getElementById('no-weather-notice');
+    if (notice) notice.style.display = 'none';
+
+    // --- Aktiver Menüeintrag ---
     ['gronenberg', 'hamburg', 'kiel', 'lübeck', 'all'].forEach(loc => {
         const el = document.getElementById(`sm-${loc}`);
         if (el) el.classList.toggle('active', currentLocation === loc);
     });
-
-    if (tempChart) {
-        // Datasets in charts.js Reihenfolge:
-        // 0: HH Regen (Bar)
-        // 1: GR Regen (Bar)
-        // 2: HH RainDots (Line)
-        // 3: GR RainDots (Line)
-        // 4: HH Temp (Line)
-        // 5: GR Temp (Line)
-
-        // Setze Sichtbarkeit für Hamburg
-        tempChart.getDatasetMeta(0).hidden = !showHH;
-        tempChart.getDatasetMeta(2).hidden = !showHH;
-        tempChart.getDatasetMeta(4).hidden = !showHH;
-
-        // Setze Sichtbarkeit für Gronenberg
-        tempChart.getDatasetMeta(1).hidden = !showGR;
-        tempChart.getDatasetMeta(3).hidden = !showGR;
-        tempChart.getDatasetMeta(5).hidden = !showGR;
-
-        tempChart.update('none');
-    }
-
-    // Wind Karte (nur GR)
-    document.getElementById('wind-card').style.display = showGR ? '' : 'none';
-
-    // Taschensee + Blitz (nur GR)
-    const _sw = document.getElementById('taschensee-card');
-    if (_sw) _sw.style.display = showGR ? '' : 'none';
-    const _bz = document.getElementById('blitz-card');
-    if (_bz) _bz.style.display = showGR ? '' : 'none';
-
-    // Tabelle
-    document.querySelectorAll('.fc-row-0, .fc-row-sep').forEach(el => el.style.display = showHH ? '' : 'none');
-    document.querySelectorAll('.fc-row-1').forEach(el => el.style.display = showGR ? '' : 'none');
-
-    // Haupt-Wetter-Card ausblenden wenn regen-only
-    const tempCard = document.getElementById('temp-card');
-    if (tempCard) tempCard.style.display = regenOnly ? 'none' : '';
-
-    // Legende
-    const toggleLeg = (id, show) => {
-        const el = document.getElementById(id);
-        if(el) el.style.display = show ? '' : 'none';
-    };
-    toggleLeg('leg-hh-temp', showHH);
-    toggleLeg('leg-hh-rain', showHH);
-    toggleLeg('leg-gr-temp', showGR);
-    toggleLeg('leg-gr-rain', showGR);
 }
 
 
@@ -237,7 +262,7 @@ window.setLocation = (loc) => {
     currentLocation = loc;
     localStorage.setItem('wetter-loc', loc);
     ui.dom.settingsMenu.classList.remove('open');
-    // Regen-Nowcast-Standort synchron halten
+    // Regen-Nowcast-Standort synchron halten (bei 'all' → Gronenberg)
     regen.setSite(loc === 'all' ? 'Gronenberg' : loc);
     applyLocationFilter();
 };
@@ -252,8 +277,9 @@ window.openFS = (type) => {
       title.textContent = "Temperatur & Niederschlag";
       config = charts.getTempChartConfig(cachedData, currentRange, CITIES, 'fs-canvas');
     } else if (type === 'wind') {
-      title.textContent = "Windgeschwindigkeit Gronenberg";
-      config = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'fs-canvas');
+      const wIdx = getWindCityIdx();
+      title.textContent = `Windgeschwindigkeit ${CITIES[wIdx].name}`;
+      config = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'fs-canvas', wIdx);
     } else if (type === 'seewasser') {
       const c = seewasser.getFSConfig();
       if (!c) return;
@@ -264,7 +290,7 @@ window.openFS = (type) => {
       config = charts.getSeaChartConfig(marineCache, currentRange, CITIES, 'fs-canvas');
     }
 
-    // AKTUALISIERUNG: Setze den FullScreen Flag für das Symbol-Plugin
+    // Setze den FullScreen Flag für das Symbol-Plugin
     config.options.plugins.fullScreen = true;
 
     modal.classList.add('open');
@@ -308,8 +334,8 @@ window.locateMe = () => {
     navigator.geolocation.getCurrentPosition(
       pos => {
         const { latitude: lat, longitude: lon } = pos.coords;
-        // Nächsten Ort aus allen REGEN_SITES (inkl. Kiel/Lübeck) bestimmen
-        const nearest = REGEN_SITES.reduce((a, b) => {
+        // Nächsten Ort aus allen Städten bestimmen
+        const nearest = CITIES.reduce((a, b) => {
           const d1 = Math.pow(a.lat-lat,2)+Math.pow(a.lon-lon,2);
           const d2 = Math.pow(b.lat-lat,2)+Math.pow(b.lon-lon,2);
           return d1 < d2 ? a : b;

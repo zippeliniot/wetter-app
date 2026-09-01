@@ -1,4 +1,4 @@
-import { DN } from './config.js';
+import { DN, COL, ABBR } from './config.js';
 import { getWmoInfo } from './utils.js'; // KORRIGIERT: Import jetzt aus utils.js statt config.js
 
 export const dom = {
@@ -20,7 +20,7 @@ export function buildForecastShell(allData, cities) {
       <tr class="fc-dh"><td></td>${dayLabels.map(d => `<td>${d}</td>`).join('')}</tr>
       ${cities.map((c, ci) => `
         <tr class="fc-city-row fc-row-${ci}">
-          <td class="fc-city-lbl"><span style="background:${ci===0?'#FFB830':'#4DD9FF'};"></span>${ci===0?'HH':'GR'}</td>
+          <td class="fc-city-lbl"><span style="background:${COL[ci]?.line ?? '#fff'};"></span>${ABBR[c.name] ?? c.name.slice(0,2).toUpperCase()}</td>
           ${days.map((_,di) => `<td><div class="fc-icon" id="fc-${ci}-${di}-icon"></div><div class="fc-max" id="fc-${ci}-${di}-max"></div><div class="fc-min" id="fc-${ci}-${di}-min"></div></td>`).join('')}
         </tr>
         ${ci === 0 ? '<tr class="fc-city-sep fc-row-sep"><td colspan="8"></td></tr>' : ''}`).join('')}

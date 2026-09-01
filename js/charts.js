@@ -183,6 +183,8 @@ function getSharedTimeRange(timeArray, range) {
 
 export function getTempChartConfig(allData, range, cities, canvasId = 'temp-chart') {
     const { labels, nightArr, start, end, step } = getSharedTimeRange(allData[0].hourly.time, range);
+    const N = allData.length;
+
     const temps = allData.map(d => { const out = []; for (let i = start; i < end; i += step) out.push(d.hourly.temperature_2m[i]); return out; });
     const codes = allData.map(d => { const out = []; for (let i = start; i < end; i += step) out.push(d.hourly.weather_code[i] ?? 0); return out; });
     const rains = allData.map(d => {
@@ -202,23 +204,40 @@ export function getTempChartConfig(allData, range, cities, canvasId = 'temp-char
       g.addColorStop(0, COL[i].fill); g.addColorStop(1, 'rgba(0,0,0,0)'); return g;
     });
 
+    // Regen-Balken: 1 pro Stadt (Indices 0 … N-1)
+    const rainBars = allData.map((_, i) => ({
+      type: 'bar', label: `${cities[i].name} Regen`, data: rains[i],
+      backgroundColor: COL[i].bar, yAxisID: 'yRain', order: N + i + 1,
+    }));
+    // Regen-Dots: 1 pro Stadt (Indices N … 2N-1)
+    const rainDots = allData.map((_, i) => ({
+      type: 'line', label: `${cities[i].name} RainDots`, data: rains[i],
+      pointRadius: rains[i].map(v => v > 0 ? 4 : 0),
+      pointBackgroundColor: rains[i].map(rainDotColor),
+      borderWidth: 0, pointHoverRadius: 0, tension: 0, fill: false,
+      yAxisID: 'yRain', order: i + 1,
+    }));
+    // Temperatur-Linien: 1 pro Stadt (Indices 2N … 3N-1)
+    const tempLines = allData.map((_, i) => ({
+      type: 'line', label: `${cities[i].name} Temp.`, data: temps[i], codes: codes[i],
+      borderColor: COL[i].line, backgroundColor: grads[i],
+      borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.30, fill: true,
+      yAxisID: 'yTemp', order: i * 0.1,
+    }));
+
+    const N_ds = N; // Grenze Rain vs. Temp für Tooltip
     return {
       type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { type:'bar', label:'HH Regen', data:rains[0], backgroundColor: 'rgba(255,184,48,0.3)', yAxisID:'yRain', order: 5 },
-          { type:'bar', label:'GR Regen', data:rains[1], backgroundColor: 'rgba(77,217,255,0.3)', yAxisID:'yRain', order: 6 },
-          { type:'line', label:'HH RainDots', data:rains[0], pointRadius:rains[0].map(v=>v>0?4:0), pointBackgroundColor:rains[0].map(rainDotColor), borderWidth:0, pointHoverRadius:0, tension:0, fill:false, yAxisID:'yRain', order: 3 },
-          { type:'line', label:'GR RainDots', data:rains[1], pointRadius:rains[1].map(v=>v>0?4:0), pointBackgroundColor:rains[1].map(rainDotColor), borderWidth:0, pointHoverRadius:0, tension:0, fill:false, yAxisID:'yRain', order: 4 },
-          { type:'line', label:'HH Temp.', data:temps[0], codes:codes[0], borderColor:COL[0].line, backgroundColor:grads[0], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:1 },
-          { type:'line', label:'GR Temp.', data:temps[1], codes:codes[1], borderColor:COL[1].line, backgroundColor:grads[1], borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.30, fill:true, yAxisID:'yTemp', order:2 },
-        ],
-      },
+      data: { labels, datasets: [...rainBars, ...rainDots, ...tempLines] },
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { display: false }, fullScreen: false, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y}${c.datasetIndex < 4 ? ' mm' : '°C'}` }},
+        plugins: {
+          legend: { display: false }, fullScreen: false,
+          tooltip: { callbacks: { label: c => {
+            const isTemp = c.datasetIndex >= 2 * N_ds;
+            return ` ${c.dataset.label}: ${c.parsed.y}${isTemp ? '°C' : ' mm'}`;
+          }}},
         },
         scales: {
           x: xAxisCfg(),
@@ -230,17 +249,20 @@ export function getTempChartConfig(allData, range, cities, canvasId = 'temp-char
       },
       plugins: [dayNightPlugin, weatherSymbolPlugin],
       _isNight: nightArr,
-      _symEvery: range === 1 ? 3 : 4
+      _symEvery: range === 1 ? 3 : 4,
+      _N: N, // Anzahl Städte – für applyLocationFilter
     };
 }
 
-export function getWindChartConfig(allData, range, cities, canvasId = 'wind-chart') {
+export function getWindChartConfig(allData, range, cities, canvasId = 'wind-chart', cityIdx = 1) {
     const { labels, nightArr, start, end, step } = getSharedTimeRange(allData[0].hourly.time, range);
-    const gr = allData[1];
+    const ci = Math.min(cityIdx, allData.length - 1);
+    const cityData = allData[ci];
+    const cityName = cities[ci]?.name ?? 'Gronenberg';
     const winds = [], dirs = [];
     for (let i = start; i < end; i += step) {
-      winds.push(Math.round(gr.hourly.wind_speed_10m[i]));
-      dirs.push(gr.hourly.wind_direction_10m[i]);
+      winds.push(Math.round(cityData.hourly.wind_speed_10m[i]));
+      dirs.push(cityData.hourly.wind_direction_10m[i]);
     }
 
     return {
@@ -248,7 +270,7 @@ export function getWindChartConfig(allData, range, cities, canvasId = 'wind-char
       data: {
         labels,
         datasets: [{
-          label: 'Gronenberg', data: winds, dirs,
+          label: cityName, data: winds, dirs,
           backgroundColor: winds.map(windFill), borderColor: winds.map(windBorder), borderWidth: 1, borderRadius: 3,
         }],
       },

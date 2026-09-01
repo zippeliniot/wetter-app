@@ -11,20 +11,32 @@ export const CITIES = [
         lat: 54.04541193007556,
         lon: 10.708640362471053
     },
+    {
+        name: 'Kiel',
+        sub: 'Landeshauptstadt S.-H.',
+        lat: 54.32320,
+        lon: 10.12281
+    },
+    {
+        name: 'Lübeck',
+        sub: 'Hansestadt',
+        lat: 53.86893,
+        lon: 10.68729
+    },
 ];
 
-// Alle Regen-Nowcast-Standorte (GPS für ICON-D2 Radar-Auswertung)
-export const REGEN_SITES = [
-    { name: 'Gronenberg', lat: 54.04541193007556, lon: 10.708640362471053 },
-    { name: 'Hamburg',    lat: 53.56389207412397, lon: 10.010347420810374 },
-    { name: 'Kiel',       lat: 54.32320,          lon: 10.12281 },
-    { name: 'Lübeck',     lat: 53.86893,          lon: 10.68729 },
-];
+// Regen-Nowcast-Standorte – direkt aus CITIES abgeleitet (GPS immer synchron)
+export const REGEN_SITES = CITIES.map(c => ({ name: c.name, lat: c.lat, lon: c.lon }));
 
 export const COL = [
-    { line: '#FFB830', fill: 'rgba(255,184,48,0.36)',  bar: 'rgba(255,184,48,0.52)', barB: 'rgba(255,184,48,0.78)' },
-    { line: '#4DD9FF', fill: 'rgba(77,217,255,0.28)',  bar: 'rgba(77,217,255,0.48)', barB: 'rgba(77,217,255,0.72)' },
+    { line: '#FFB830', fill: 'rgba(255,184,48,0.36)',  bar: 'rgba(255,184,48,0.30)', barB: 'rgba(255,184,48,0.78)' }, // Hamburg: orange
+    { line: '#4DD9FF', fill: 'rgba(77,217,255,0.28)',  bar: 'rgba(77,217,255,0.25)', barB: 'rgba(77,217,255,0.72)' }, // Gronenberg: cyan
+    { line: '#4ade80', fill: 'rgba(74,222,128,0.28)',  bar: 'rgba(74,222,128,0.25)', barB: 'rgba(74,222,128,0.70)' }, // Kiel: grün
+    { line: '#c084fc', fill: 'rgba(192,132,252,0.28)', bar: 'rgba(192,132,252,0.25)', barB: 'rgba(192,132,252,0.70)' }, // Lübeck: violett
 ];
+
+// Kürzel für Tabellenkopf
+export const ABBR = { Hamburg: 'HH', Gronenberg: 'GR', Kiel: 'KI', 'Lübeck': 'LÜ' };
 
 export const WMO = {
     0:['Klarer Himmel','☀️'],    1:['Überwiegend klar','🌤️'],
