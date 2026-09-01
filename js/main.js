@@ -5,6 +5,7 @@ import * as utils from './utils.js';
 import * as charts from './charts.js';
 import * as seewasser from './seewasser.js';
 import * as blitz from './blitz.js';
+import * as regen from './regen.js';
 
 // --- STATE ---
 let currentRange = 1;
@@ -257,10 +258,18 @@ window.closeFS = () => {
 
 window.manualRefresh = () => {
     remaining = 15;
+    if (regen.isActive()) {
+        regen.refresh();
+        return;
+    }
     loadAll(false);
     seewasser.refreshLive();
     blitz.refresh();
+    regen.refreshNavStatus();
 };
+
+window.showRegen = () => regen.show();
+window.showMain = () => regen.hide();
 
 window.togglePause = () => {
     paused = !paused;
@@ -305,6 +314,9 @@ setInterval(() => {
 
 // --- INIT SEQUENCE ---
 window.addEventListener('DOMContentLoaded', async () => {
+    // Regen-Button-Status sofort (unabhaengig vom restlichen Wetter-Cache)
+    regen.initRegen();
+
     // 1. Erst Cache laden (sofortige Anzeige)
     await loadFromCache();
 

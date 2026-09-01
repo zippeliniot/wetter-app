@@ -21,3 +21,18 @@ export async function fetchMarineData() {
     if (!r.ok) throw new Error(`Marine HTTP ${r.status}`);
     return r.json();
 }
+
+/** Multi-Punkt 15-Min-Niederschlag (ca. 2 h) für Regen-Nowcast */
+export async function fetchRegenNowcast(points) {
+    const p = new URLSearchParams({
+      latitude: points.map(x => x.lat).join(','),
+      longitude: points.map(x => x.lon).join(','),
+      minutely_15: 'precipitation',
+      forecast_minutely_15: '8',
+      timezone: 'Europe/Berlin',
+    });
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?${p}`);
+    if (!r.ok) throw new Error(`Regen HTTP ${r.status}`);
+    const data = await r.json();
+    return Array.isArray(data) ? data : [data];
+}

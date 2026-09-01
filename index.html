@@ -99,13 +99,43 @@
     .bz-k { font-size: 0.8rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.6px; }
     .bz-v { font-size: 1.1rem; font-weight: 700; }
     .bz-empty { text-align: center; opacity: 0.7; padding: 16px 0; font-size: 0.9rem; }
+    .hidden { display: none !important; }
+    .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .nav-btn { background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.28); color: #fff; padding: 7px 14px; border-radius: 50px; cursor: pointer; font-size: 0.78rem; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; transition: background 0.18s; flex-shrink: 0; }
+    .nav-btn:hover { background: rgba(255,255,255,0.22); }
+    .nav-btn.accent { border-color: rgba(77,217,255,0.55); color: #4DD9FF; }
+    .nav-btn.dry { border-color: rgba(255,255,255,0.22); color: rgba(255,255,255,0.72); }
+    .regen-sub { font-size: 0.78rem; opacity: 0.7; margin-top: 2px; letter-spacing: 0.4px; }
+    .regen-hero-title { font-size: 1.35rem; font-weight: 700; color: #4DD9FF; margin: 4px 0 6px; }
+    .regen-hero-feel { font-size: 0.9rem; line-height: 1.4; opacity: 0.9; }
+    .regen-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    .regen-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    .regen-stat-lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin-bottom: 6px; }
+    .regen-stat-main { font-size: 1.35rem; font-weight: 700; }
+    .regen-stat-sub { font-size: 0.82rem; margin-top: 4px; }
+    .regen-stat-sub.green { color: #4ade80; }
+    .regen-stat-sub.amber { color: #FFB830; }
+    .regen-stat-sub.cyan { color: #4DD9FF; }
+    .regen-section-lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin: 4px 2px 8px; }
+    .regen-radar-wrap { width: 100%; max-width: 360px; margin: 0 auto; }
+    .regen-radar-wrap svg { width: 100%; height: auto; display: block; }
+    .regen-footnote { text-align: center; font-size: 0.78rem; opacity: 0.65; margin: 8px 0 4px; }
+    .regen-error { display: none; text-align: center; color: #fbbf24; font-size: 0.88rem; padding: 12px; }
+    @media (max-width: 420px) {
+      .regen-grid-3 { grid-template-columns: 1fr; }
+      .regen-stat-main { font-size: 1.2rem; }
+      h1 { font-size: 1.15rem; letter-spacing: 2px; }
+    }
   </style>
 </head>
 <body>
 
 <div class="page">
-  <div class="header-bar">
-    <h1>Wetter</h1>
+  <div class="header-bar" id="main-header">
+    <div class="header-left">
+      <h1>Wetter</h1>
+      <button class="nav-btn dry" id="btn-regen" onclick="window.showRegen()" title="Regen-Vorhersage 2 Stunden" aria-label="Regen-Vorhersage öffnen">Kein Regen</button>
+    </div>
     <div style="display:flex;align-items:center;gap:10px;">
       <div class="range-toggle" role="group" aria-label="Zeitraum wählen">
         <button class="range-btn active" id="btn1" onclick="window.setRange(1)" aria-label="1 Tag anzeigen">1 Tag</button>
@@ -126,6 +156,70 @@
     </div>
   </div>
 
+  <div class="header-bar hidden" id="regen-header">
+    <div>
+      <h1>Regen · 2 Stunden Vorhersage</h1>
+      <div class="regen-sub" id="regen-loc">Gronenberg</div>
+    </div>
+    <button class="nav-btn" id="btn-regen-back" onclick="window.showMain()" title="Zurück zur Übersicht" aria-label="Zurück zur Wetterübersicht">Zurück</button>
+  </div>
+
+  <div id="regen-view" class="hidden">
+    <p class="regen-error" id="regen-error"></p>
+    <p class="regen-footnote" id="regen-meta" style="text-align:left;margin-bottom:10px;">Wird geladen …</p>
+
+    <div class="card">
+      <div class="card-title" style="cursor:default;">Heute Abend</div>
+      <div class="regen-hero-title" id="regen-verdict">…</div>
+      <div class="regen-hero-feel" id="regen-hero-feel">Vorhersage wird geladen …</div>
+    </div>
+
+    <div class="regen-grid-2">
+      <div class="card" style="margin-bottom:0;">
+        <div class="regen-stat-lbl">ETA am Ort</div>
+        <div class="regen-stat-main" id="regen-eta-main">—</div>
+        <div class="regen-stat-sub green" id="regen-eta-sub">—</div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="regen-stat-lbl">Peak</div>
+        <div class="regen-stat-main" id="regen-peak-main">—</div>
+        <div class="regen-stat-sub amber" id="regen-peak-sub">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="cursor:default;">Intensität ab jetzt</div>
+      <div class="chart-wrapper" style="height: 220px;"><canvas id="regen-chart"></canvas></div>
+    </div>
+
+    <div class="regen-section-lbl">Wann kommt der Regen in die Nähe?</div>
+    <div class="regen-grid-3">
+      <div class="card" style="margin-bottom:0;">
+        <div class="regen-stat-lbl">Regen &lt; 10 km</div>
+        <div class="regen-stat-main" style="font-size:1.05rem;color:#4ade80;" id="regen-prox10">—</div>
+        <div class="regen-stat-sub">10-km-Kreis</div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="regen-stat-lbl">Regen &lt; 5 km</div>
+        <div class="regen-stat-main" style="font-size:1.05rem;color:#FFB830;" id="regen-prox5">—</div>
+        <div class="regen-stat-sub">5-km-Kreis</div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="regen-stat-lbl">Menge am Ort</div>
+        <div class="regen-stat-main" style="font-size:1.05rem;color:#4DD9FF;" id="regen-sum">—</div>
+        <div class="regen-stat-sub">Summe 2 h</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="cursor:default;">Radar · Annäherung</div>
+      <div class="regen-radar-wrap"><svg id="regen-radar-svg" viewBox="0 0 320 280" aria-label="Regenfront Annäherung"></svg></div>
+    </div>
+
+    <p class="regen-footnote">Nowcast · keine Regenwahrscheinlichkeit % · Update ~15 Min</p>
+  </div>
+
+  <div id="main-view">
   <div class="card">
     <div class="chart-head">
       <span class="card-title" onclick="window.openFS('temp')">Temperatur &amp; Niederschlag ↗</span>
@@ -212,6 +306,7 @@
     <span class="status-dot" id="status-dot"></span>
     <span id="updated-text">Wird geladen …</span>
   </p>
+  </div><!-- /main-view -->
 
 </div>
 
@@ -228,7 +323,7 @@
     <div class="modal-title">Impressum</div>
     <p>Diese Seite ist ein privates, nicht-kommerzielles Projekt.</p>
     <p style="margin-top:8px;">Betreiber: gronenberg.info</p>
-    <p style="margin-top:8px;opacity:0.7;font-size:0.78rem;">Wetterdaten: Open-Meteo API (open-meteo.com)</p>
+    <p style="margin-top:8px;opacity:0.7;font-size:0.78rem;">Wetterdaten: Open-Meteo API (open-meteo.com). Regen-Nowcast: ICON-D2 15-Minuten.</p>
     <button class="modal-close" onclick="window.closeImpressum()">Schließen</button>
   </div>
 </div>
