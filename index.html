@@ -22,6 +22,9 @@
     .chart-wrapper { position: relative; width: 100%; margin-top: 10px; }
     .card-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.2px; opacity: 0.85; margin-bottom: 10px; cursor: pointer; display: inline-block; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; user-select: none; }
     .card-title:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    /* Nicht-klickbare Card-Titel (kein Hover-Effekt, kein Pointer-Cursor) */
+    .card-title--static { cursor: default; }
+    .card-title--static:hover { background: transparent; }
     .fc-table { width: 100%; border-collapse: collapse; }
     .fc-table td { text-align: center; padding: 5px 3px; vertical-align: middle; font-size: 0.82rem; }
     .fc-table .fc-dh td { font-size: 0.75rem; text-transform: uppercase; opacity: 0.85; padding-bottom: 6px; }
@@ -169,7 +172,7 @@
     <p class="regen-footnote" id="regen-meta" style="text-align:left;margin-bottom:10px;">Wird geladen …</p>
 
     <div class="card">
-      <div class="card-title" style="cursor:default;">Heute Abend</div>
+      <div class="card-title card-title--static" id="regen-hero-label">Nowcast wird geladen …</div>
       <div class="regen-hero-title" id="regen-verdict">…</div>
       <div class="regen-hero-feel" id="regen-hero-feel">Vorhersage wird geladen …</div>
     </div>
@@ -188,7 +191,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title" style="cursor:default;">Intensität ab jetzt</div>
+      <div class="card-title card-title--static">Intensität ab jetzt</div>
       <div class="chart-wrapper" style="height: 220px;"><canvas id="regen-chart"></canvas></div>
     </div>
 
@@ -212,7 +215,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title" style="cursor:default;">Radar · Annäherung</div>
+      <div class="card-title card-title--static">Radar · Annäherung</div>
       <div class="regen-radar-wrap"><svg id="regen-radar-svg" viewBox="0 0 320 280" aria-label="Regenfront Annäherung"></svg></div>
     </div>
 

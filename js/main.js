@@ -309,7 +309,7 @@ setInterval(() => {
     remaining--;
     ui.dom.ringProgress.style.strokeDashoffset = (2 * Math.PI * 12) * (1 - remaining / 15);
     ui.dom.countdownNum.textContent = remaining;
-    if (remaining <= 0) { remaining = 15; loadAll(true); }
+    if (remaining <= 0) { remaining = 15; loadAll(true); regen.refreshNavStatus(); }
 }, 1000);
 
 // --- INIT SEQUENCE ---

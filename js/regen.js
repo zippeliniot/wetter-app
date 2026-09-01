@@ -1,8 +1,10 @@
 // js/regen.js — Regen-Nowcast (2 h) für Gronenberg, UI-Seite neben Hauptwetter
 
 import { fetchRegenNowcast } from './api.js';
+import { CITIES } from './config.js';
 
-const SITE = { name: 'Gronenberg', lat: 54.045146, lon: 10.716015 };
+// Koordinaten aus config.js – immer synchron mit dem Rest der App
+const SITE = CITIES.find(c => c.name === 'Gronenberg');
 const RAIN_MMH = 0.05;
 const DIRS = [
   { code: 'N', ang: 0 },
@@ -142,6 +144,7 @@ function buildModel(responses, points, now = Date.now()) {
   let verdict = 'Kein Regen';
   let heroFeel = 'In den nächsten 2 Stunden kein Niederschlag am Ort erwartet.';
   if (rains) {
+    // Als „kurz" gilt Regen an ≤ 3 Zeitschritten (≤ 45 Minuten).
     const short = timeline.filter(s => s.is_raining).length <= 3;
     verdict = (short ? 'Kurzer ' : '') + peakCls.verdict;
     heroFeel = `${verdict} ab ca. ${onset.cest} Uhr. ${peakCls.feel}`;
@@ -299,7 +302,8 @@ function renderChart(model) {
         if (beginIdx < 0) return;
         const xScale = c.scales.x;
         const yScale = c.scales.y;
-        const x = xScale.getPixelForValue(beginIdx);
+        // getPixelForIndex liefert die korrekte X-Position für Kategorie-Achsen (Chart.js 4)
+        const x = xScale.getPixelForIndex(beginIdx);
         const ctx = c.ctx;
         ctx.save();
         ctx.strokeStyle = 'rgba(77,217,255,0.7)';
@@ -339,6 +343,8 @@ function render(model) {
   updateNavButton(model.rains);
   setText('regen-loc', SITE.name);
   setText('regen-meta', `Ab Jetzt · bis ${model.endCest} · ${model.source}`);
+  // Hero-Card-Titel zeitabhängig setzen (nicht statisch „Heute Abend")
+  setText('regen-hero-label', `${model.nowCest} – ${model.endCest} Uhr`);
   setText('regen-verdict', model.verdict);
   setText('regen-hero-feel', model.heroFeel);
 
