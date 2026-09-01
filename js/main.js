@@ -1,4 +1,4 @@
-import { CITIES, COL } from './config.js';
+import { CITIES, COL, REGEN_SITES } from './config.js';
 import * as api from './api.js';
 import * as ui from './ui.js';
 import * as utils from './utils.js';
@@ -149,8 +149,24 @@ function updateSeaHeader() {
 }
 
 function applyLocationFilter() {
-    const showHH = currentLocation === 'hamburg' || currentLocation === 'all';
-    const showGR = currentLocation === 'gronenberg' || currentLocation === 'all';
+    // Kiel und Lübeck haben keine Wetter-Tabellendaten (nur Regen-Nowcast)
+    const regenOnly = currentLocation === 'kiel' || currentLocation === 'lübeck';
+    const showHH = !regenOnly && (currentLocation === 'hamburg' || currentLocation === 'all');
+    const showGR = !regenOnly && (currentLocation === 'gronenberg' || currentLocation === 'all');
+
+    // Hinweis-Card für regen-only Standorte
+    const notice = document.getElementById('no-weather-notice');
+    if (notice) notice.style.display = regenOnly ? '' : 'none';
+    if (regenOnly) {
+        const cityEl = document.getElementById('no-weather-city');
+        if (cityEl) cityEl.textContent = currentLocation.charAt(0).toUpperCase() + currentLocation.slice(1);
+    }
+
+    // Aktiven Menüeintrag markieren
+    ['gronenberg', 'hamburg', 'kiel', 'lübeck', 'all'].forEach(loc => {
+        const el = document.getElementById(`sm-${loc}`);
+        if (el) el.classList.toggle('active', currentLocation === loc);
+    });
 
     if (tempChart) {
         // Datasets in charts.js Reihenfolge:
@@ -187,6 +203,10 @@ function applyLocationFilter() {
     document.querySelectorAll('.fc-row-0, .fc-row-sep').forEach(el => el.style.display = showHH ? '' : 'none');
     document.querySelectorAll('.fc-row-1').forEach(el => el.style.display = showGR ? '' : 'none');
 
+    // Haupt-Wetter-Card ausblenden wenn regen-only
+    const tempCard = document.getElementById('temp-card');
+    if (tempCard) tempCard.style.display = regenOnly ? 'none' : '';
+
     // Legende
     const toggleLeg = (id, show) => {
         const el = document.getElementById(id);
@@ -217,6 +237,8 @@ window.setLocation = (loc) => {
     currentLocation = loc;
     localStorage.setItem('wetter-loc', loc);
     ui.dom.settingsMenu.classList.remove('open');
+    // Regen-Nowcast-Standort synchron halten
+    regen.setSite(loc === 'all' ? 'Gronenberg' : loc);
     applyLocationFilter();
 };
 
@@ -286,7 +308,8 @@ window.locateMe = () => {
     navigator.geolocation.getCurrentPosition(
       pos => {
         const { latitude: lat, longitude: lon } = pos.coords;
-        const nearest = CITIES.reduce((a, b) => {
+        // Nächsten Ort aus allen REGEN_SITES (inkl. Kiel/Lübeck) bestimmen
+        const nearest = REGEN_SITES.reduce((a, b) => {
           const d1 = Math.pow(a.lat-lat,2)+Math.pow(a.lon-lon,2);
           const d2 = Math.pow(b.lat-lat,2)+Math.pow(b.lon-lon,2);
           return d1 < d2 ? a : b;
@@ -314,6 +337,9 @@ setInterval(() => {
 
 // --- INIT SEQUENCE ---
 window.addEventListener('DOMContentLoaded', async () => {
+    // Regen-Standort mit gespeicherter Location synchronisieren
+    regen.setSite(currentLocation === 'all' ? 'Gronenberg' : currentLocation);
+
     // Regen-Button-Status sofort (unabhaengig vom restlichen Wetter-Cache)
     regen.initRegen();
 

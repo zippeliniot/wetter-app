@@ -148,11 +148,13 @@
         <div class="settings-menu" id="settings-menu">
           <div class="sm-item" id="sm-gronenberg" onclick="window.setLocation('gronenberg')">1 · Gronenberg</div>
           <div class="sm-item" id="sm-hamburg"    onclick="window.setLocation('hamburg')">2 · Hamburg</div>
-          <div class="sm-item" id="sm-all"        onclick="window.setLocation('all')">3 · Alle Standorte</div>
+          <div class="sm-item" id="sm-kiel"       onclick="window.setLocation('kiel')">3 · Kiel</div>
+          <div class="sm-item" id="sm-lübeck"     onclick="window.setLocation('lübeck')">4 · Lübeck</div>
+          <div class="sm-item" id="sm-all"        onclick="window.setLocation('all')">5 · Alle Standorte</div>
           <div class="sm-sep"></div>
           <div class="sm-item" id="sm-gps"        onclick="window.locateMe()">📍 Meinen Standort</div>
           <div class="sm-sep"></div>
-          <div class="sm-item sm-impressum"       onclick="window.showImpressum()">9 · Impressum(7)</div>
+          <div class="sm-item sm-impressum"       onclick="window.showImpressum()">9 · Impressum</div>
         </div>
       </div>
     </div>
@@ -222,7 +224,14 @@
   </div>
 
   <div id="main-view">
-  <div class="card">
+  <!-- Hinweis für Standorte ohne Wetter-Tabellendaten (Kiel, Lübeck) -->
+  <div class="card" id="no-weather-notice" style="display:none; text-align:center; padding:18px 16px;">
+    <div style="font-size:1.4rem; margin-bottom:8px;">🌧️</div>
+    <div style="font-weight:700; margin-bottom:6px;" id="no-weather-city">Regen-Nowcast</div>
+    <div style="opacity:0.75; font-size:0.85rem; line-height:1.5;">Wetter-Tabelle nur für Hamburg &amp; Gronenberg.<br>Für diesen Ort ist der Regen-Nowcast verfügbar.</div>
+    <button class="nav-btn accent" style="margin-top:14px;" onclick="window.showRegen()">Regen-Vorhersage öffnen ↗</button>
+  </div>
+  <div class="card" id="temp-card">
     <div class="chart-head">
       <span class="card-title" onclick="window.openFS('temp')">Temperatur &amp; Niederschlag ↗</span>
       <div class="chart-legend">

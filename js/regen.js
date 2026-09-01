@@ -1,10 +1,10 @@
-// js/regen.js — Regen-Nowcast (2 h) für Gronenberg, UI-Seite neben Hauptwetter
+// js/regen.js — Regen-Nowcast (2 h), Standort dynamisch wählbar
 
 import { fetchRegenNowcast } from './api.js';
-import { CITIES } from './config.js';
+import { REGEN_SITES } from './config.js';
 
-// Koordinaten aus config.js – immer synchron mit dem Rest der App
-const SITE = CITIES.find(c => c.name === 'Gronenberg');
+// Aktiver Standort – Standard: Gronenberg; wird per setSite() umgeschaltet
+let currentSite = REGEN_SITES[0];
 const RAIN_MMH = 0.05;
 const DIRS = [
   { code: 'N', ang: 0 },
@@ -47,10 +47,11 @@ function offsetLatLon(lat, lon, km, bearingDeg) {
 }
 
 function samplePoints() {
-  const pts = [{ id: 'site', lat: SITE.lat, lon: SITE.lon, km: 0, dir: null }];
+  const { lat, lon } = currentSite;
+  const pts = [{ id: 'site', lat, lon, km: 0, dir: null }];
   for (const km of RING_KM) {
     for (const d of DIRS) {
-      const p = offsetLatLon(SITE.lat, SITE.lon, km, d.ang);
+      const p = offsetLatLon(lat, lon, km, d.ang);
       pts.push({ id: `${d.code}-${km}`, lat: p.lat, lon: p.lon, km, dir: d.code });
     }
   }
@@ -341,7 +342,7 @@ function updateNavButton(rains) {
 function render(model) {
   lastModel = model;
   updateNavButton(model.rains);
-  setText('regen-loc', SITE.name);
+  setText('regen-loc', currentSite.name);
   setText('regen-meta', `Ab Jetzt · bis ${model.endCest} · ${model.source}`);
   // Hero-Card-Titel zeitabhängig setzen (nicht statisch „Heute Abend")
   setText('regen-hero-label', `${model.nowCest} – ${model.endCest} Uhr`);
@@ -395,10 +396,16 @@ export async function refresh() {
   }
 }
 
-/** Leichte Abfrage nur für den Header-Button (Standort, 2 h). */
+/** Wechselt den Regen-Standort anhand des Ortsnamens (aus REGEN_SITES). */
+export function setSite(locName) {
+  const found = REGEN_SITES.find(s => s.name.toLowerCase() === locName.toLowerCase());
+  if (found) currentSite = found;
+}
+
+/** Leichte Abfrage nur für den Header-Button (aktueller Standort, 2 h). */
 export async function refreshNavStatus() {
   try {
-    const points = [{ id: 'site', lat: SITE.lat, lon: SITE.lon, km: 0, dir: null }];
+    const points = [{ id: 'site', lat: currentSite.lat, lon: currentSite.lon, km: 0, dir: null }];
     const responses = await fetchRegenNowcast(points);
     const model = buildModel(responses, points);
     updateNavButton(!!model.rains);
