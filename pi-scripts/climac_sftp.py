@@ -16,10 +16,20 @@ import stat
 
 import paramiko
 
-DB_PATH = "/opt/climac/data/climac.db"
+DB_PATH = os.environ.get("CLIMAC_DB_PATH", "/opt/climac/data/climac.db")
 
 SFTP_CRED_ID = "sftp_ionos_wetter"
 INFLUX_CRED_ID = "influx_v2_local"
+
+# Optional: lokales Deploy ohne SQLite (Windows), z. B.:
+#   SFTP_IONOS_HOST / SFTP_IONOS_PORT / SFTP_IONOS_USER / SFTP_IONOS_PASSWORD / SFTP_IONOS_PATH
+ENV_SFTP = {
+    "target": "SFTP_IONOS_HOST",
+    "port": "SFTP_IONOS_PORT",
+    "user": "SFTP_IONOS_USER",
+    "secret": "SFTP_IONOS_PASSWORD",
+    "path": "SFTP_IONOS_PATH",
+}
 
 # Feste Vorgaben laut Projekt-Kontext (CLAUDE.md / migration_config)
 INFLUX_ORG = "home"
@@ -52,7 +62,21 @@ SENSOR_MEASUREMENTS = {
 
 def get_credential(cred_id: str) -> dict:
     """Liest einen Credential-Datensatz aus SQLite. Eigene Verbindung,
-    die sofort wieder geschlossen wird (Standalone-Script, kein API-Handler)."""
+    die sofort wieder geschlossen wird (Standalone-Script, kein API-Handler).
+
+    Fuer SFTP_IONOS: alternativ Umgebungsvariablen SFTP_IONOS_* (lokales Deploy).
+    """
+    if cred_id == SFTP_CRED_ID:
+        env = {k: os.environ.get(v) for k, v in ENV_SFTP.items()}
+        if env.get("target") and env.get("user") and env.get("secret") is not None:
+            return {
+                "target": env["target"],
+                "port": int(env["port"] or 22),
+                "user": env["user"],
+                "secret": env["secret"],
+                "path": env.get("path") or "",
+            }
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     try:
