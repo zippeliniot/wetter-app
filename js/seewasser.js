@@ -358,6 +358,45 @@ async function cfgMonat() {
     hi.push(r ? r.sw40.max : null);
   }
 
+  // Aktueller Monat: fehlende Tage aus hours.json (Tagesmittel) + live.json (heute) auffüllen
+  if (monthCursor === ym(new Date())) {
+    const today = new Date();
+    const todayDay = today.getDate();
+
+    // Stundenwerte nach Tag gruppieren (nur aktueller Monat)
+    const hoursByDay = {};
+    for (const row of (hoursData && hoursData.hours) || []) {
+      const dt = new Date(row.t);
+      if (dt.getFullYear() !== y || dt.getMonth() + 1 !== m) continue;
+      const d = dt.getDate();
+      if (!hoursByDay[d]) hoursByDay[d] = { sw40: [], swgr: [], at: [] };
+      if (row.sw40 != null) hoursByDay[d].sw40.push(row.sw40);
+      if (row.swgr != null) hoursByDay[d].swgr.push(row.swgr);
+      if (row.at  != null) hoursByDay[d].at.push(row.at);
+    }
+    const mean = (arr) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10 : null;
+
+    for (let d = 1; d <= Math.min(todayDay, dim); d++) {
+      const idx = d - 1;
+      const hrs = hoursByDay[d];
+      if (hrs) {
+        if (sw40m[idx] == null) sw40m[idx] = mean(hrs.sw40);
+        if (swgrm[idx] == null) swgrm[idx] = mean(hrs.swgr);
+        const atM = mean(hrs.at);
+        if (atAvg[idx] == null && atM != null) { atAvg[idx] = atM; atMin[idx] = atMin[idx] ?? atM; atMax[idx] = atMax[idx] ?? atM; }
+      }
+    }
+
+    // Live-Fallback für heute
+    if (live) {
+      const idx = todayDay - 1;
+      if (sw40m[idx] == null && live.sw40 != null) sw40m[idx] = live.sw40;
+      if (swgrm[idx] == null && live.swgr != null) swgrm[idx] = live.swgr;
+      if (lo[idx] == null && live.sw40 != null) { lo[idx] = live.sw40; hi[idx] = live.sw40; }
+      if (atAvg[idx] == null && live.at != null) { atAvg[idx] = live.at; atMin[idx] = atMin[idx] ?? live.at; atMax[idx] = atMax[idx] ?? live.at; }
+    }
+  }
+
   const ds = [...band(hi, lo, C_SW40), line('40 cm', sw40m, C_SW40), line('Grund', swgrm, C_SWGR),
     ...atBand(atMin, atMax, atAvg)];
 
