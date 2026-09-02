@@ -261,6 +261,38 @@ async function cfgDailyWindow(nDays, withBand) {
   ds.push(line('40 cm', sw40m, C_SW40, withBand ? {} : { fill: true, backgroundColor: hexA(C_SW40, 0.10) }));
   ds.push(line('Grund', swgrm, C_SWGR));
   ds.push(...atBand(at.min, at.max, at.avg));
+
+  // Sensor ausgefallen? → letzten bekannten Wert aus Vormonaten als gestrichelte Referenz
+  const hasData = sw40m.some(v => v != null);
+  if (!hasData) {
+    let lastSw40 = null, lastSwgr = null;
+    for (let delta = -1; delta >= -4 && (lastSw40 == null || lastSwgr == null); delta--) {
+      const prevKey = shiftYm(ym(today), delta);
+      if (prevKey < FIRST_MONTH) break;
+      try {
+        const prevRec = monthRecords(await loadMonth(prevKey));
+        const [py, pm] = prevKey.split('-').map(Number);
+        const prevDim = new Date(py, pm, 0).getDate();
+        for (let d = prevDim; d >= 1; d--) {
+          const r = prevRec[d];
+          if (r && r.sw40.mean != null && lastSw40 == null) lastSw40 = r.sw40.mean;
+          if (r && r.swgr.mean != null && lastSwgr == null) lastSwgr = r.swgr.mean;
+          if (lastSw40 != null && lastSwgr != null) break;
+        }
+      } catch (e) { /* Vormonat nicht verfügbar */ }
+    }
+    const dashOpts = { borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, spanGaps: true };
+    if (lastSw40 != null)
+      ds.push({ ...dashOpts, label: '40 cm (letzter Wert)', data: new Array(nDays).fill(lastSw40),
+        borderColor: hexA(C_SW40, 0.50), backgroundColor: 'transparent' });
+    if (lastSwgr != null)
+      ds.push({ ...dashOpts, label: 'Grund (letzter Wert)', data: new Array(nDays).fill(lastSwgr),
+        borderColor: hexA(C_SWGR, 0.50), backgroundColor: 'transparent' });
+    showSensorNotice(true);
+  } else {
+    showSensorNotice(false);
+  }
+
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(nDays), false) };
 }
 
@@ -453,8 +485,8 @@ async function render() {
   if (wrap) wrap.style.display = '';
   if (nowEl) nowEl.style.display = 'none';
 
-  // Sensor-Hinweis ausblenden wenn nicht im Monat-View
-  if (activeTab !== 'monat') showSensorNotice(false);
+  // Sensor-Hinweis ausblenden wenn nicht in einem View der ihn setzen kann
+  if (activeTab !== 'monat' && activeTab !== 'woche') showSensorNotice(false);
 
   let cfg;
   try { cfg = await buildConfig(); }
