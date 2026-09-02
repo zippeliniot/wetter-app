@@ -80,11 +80,24 @@ async function loadFromCache() {
 async function loadAll(silent = false) {
     try {
         ui.setStatus('loading');
-        // Ein Batch-Request für alle Städte statt N paralleler Einzelaufrufe
-        const [allData, marineRaw] = await Promise.all([
-            api.fetchAllCitiesData(CITIES),
-            api.fetchMarineData().catch(() => null),
-        ]);
+        // Batch-Versuch, Fallback auf Einzel-Requests
+        let allData = null;
+        try {
+            allData = await api.fetchAllCitiesData(CITIES);
+        } catch (batchErr) {
+            console.warn('[loadAll] Batch fehlgeschlagen, versuche Einzel-Requests:', batchErr);
+            const results = await Promise.allSettled(CITIES.map(c => api.fetchCityData(c)));
+            allData = results.map((r, i) => {
+                if (r.status === 'fulfilled') return r.value;
+                console.warn(`[loadAll] ${CITIES[i].name} fehlgeschlagen:`, r.reason);
+                return cachedData?.[i] ?? null;
+            });
+        }
+
+        const marineRaw = await api.fetchMarineData().catch(() => null);
+
+        // Abbrechen nur wenn HH (0) UND GR (1) keine Daten haben
+        if (!allData[0] && !allData[1]) throw new Error("Kernstädte HH+GR nicht erreichbar");
 
         // Cache speichern
         localStorage.setItem(CACHE_KEY_CITY, JSON.stringify(allData));

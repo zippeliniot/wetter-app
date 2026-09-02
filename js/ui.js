@@ -34,6 +34,7 @@ export function buildForecastShell(allData, cities) {
 
 export function updateForecastValues(allData, cities) {
     allData.forEach((data, i) => {
+      if (!data) return; // Stadt ohne Daten überspringen
       const d = data.daily;
       d.time.forEach((_, j) => {
         const [, fi] = getWmoInfo(d.weather_code[j]);

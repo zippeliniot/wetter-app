@@ -185,9 +185,11 @@ export function getTempChartConfig(allData, range, cities, canvasId = 'temp-char
     const { labels, nightArr, start, end, step } = getSharedTimeRange(allData[0].hourly.time, range);
     const N = allData.length;
 
-    const temps = allData.map(d => { const out = []; for (let i = start; i < end; i += step) out.push(d.hourly.temperature_2m[i]); return out; });
-    const codes = allData.map(d => { const out = []; for (let i = start; i < end; i += step) out.push(d.hourly.weather_code[i] ?? 0); return out; });
+    const empty = Array(labels.length).fill(null);
+    const temps = allData.map(d => { if (!d) return empty; const out = []; for (let i = start; i < end; i += step) out.push(d.hourly.temperature_2m[i]); return out; });
+    const codes = allData.map(d => { if (!d) return empty; const out = []; for (let i = start; i < end; i += step) out.push(d.hourly.weather_code[i] ?? 0); return out; });
     const rains = allData.map(d => {
+      if (!d) return empty;
       const out = [];
       for (let i = start; i < end; i += step) {
         let s = 0; for (let j = i; j < Math.min(i + step, end, d.hourly.time.length); j++) s += (d.hourly.precipitation[j] ?? 0);
@@ -257,7 +259,8 @@ export function getTempChartConfig(allData, range, cities, canvasId = 'temp-char
 export function getWindChartConfig(allData, range, cities, canvasId = 'wind-chart', cityIdx = 1) {
     const { labels, nightArr, start, end, step } = getSharedTimeRange(allData[0].hourly.time, range);
     const ci = Math.min(cityIdx, allData.length - 1);
-    const cityData = allData[ci];
+    // Fallback auf erste verfügbare Stadt wenn gewählte null ist
+    const cityData = allData[ci] ?? allData.find(d => d != null);
     const cityName = cities[ci]?.name ?? 'Gronenberg';
     const winds = [], dirs = [];
     for (let i = start; i < end; i += step) {
