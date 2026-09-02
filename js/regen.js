@@ -443,6 +443,10 @@ export async function initRegen() {
   } catch (e) {
     console.warn('[regen] init:', e);
     updateNavButton(false);
+    // Bei 429: nach 60 s automatisch nochmal versuchen
+    if (String(e.message).includes('429')) {
+      setTimeout(() => refreshNavStatus().catch(() => {}), 60000);
+    }
   }
 }
 

@@ -129,6 +129,10 @@ async function loadAll(silent = false) {
         console.error('[loadAll] Kritischer Fehler:', e);
         ui.setStatus('error');
         if (!silent) ui.showToast("Aktualisierung fehlgeschlagen. Zeige alte Daten.");
+        // Bei 429: nächsten Versuch in 60 s statt in 10 Min
+        if (String(e.message).includes('429') && remainingWeather > 60) {
+            remainingWeather = 60;
+        }
     }
 }
 
