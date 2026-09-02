@@ -406,7 +406,10 @@ setInterval(() => {
 
     if (remainingRegen <= 0) {
         remainingRegen = REGEN_INTERVAL;
-        regen.refreshNavStatus();
+        regen.refreshNavStatus().then(status => {
+            // Bei 429: nächsten Regen-Check auf 10 Min verschieben
+            if (status === 'rate_limited') remainingRegen = 600;
+        });
     }
     if (remainingWeather <= 0) {
         remainingWeather = WEATHER_INTERVAL;

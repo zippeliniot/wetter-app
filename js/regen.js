@@ -431,8 +431,10 @@ export async function refreshNavStatus() {
     return model.rains;
   } catch (e) {
     console.warn('[regen] nav status:', e);
-    // Button nie bei „…“ hängen lassen
+    // Button nie bei „…” hängen lassen
     updateNavButton(false);
+    // Gibt 'rate_limited' zurück, damit der Timer den nächsten Check verschiebt
+    if (String(e.message).includes('429')) return 'rate_limited';
     return null;
   }
 }
