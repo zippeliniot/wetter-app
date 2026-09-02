@@ -1,5 +1,6 @@
 import { CITIES, COL, REGEN_SITES } from './config.js';
 import * as api from './api.js';
+// Hinweis: fetchCityData wird nicht mehr direkt verwendet – Batch via fetchAllCitiesData
 import * as ui from './ui.js';
 import * as utils from './utils.js';
 import * as charts from './charts.js';
@@ -79,14 +80,11 @@ async function loadFromCache() {
 async function loadAll(silent = false) {
     try {
         ui.setStatus('loading');
-        const [results, marineRaw] = await Promise.all([
-            Promise.allSettled(CITIES.map(c => api.fetchCityData(c))),
+        // Ein Batch-Request für alle Städte statt N paralleler Einzelaufrufe
+        const [allData, marineRaw] = await Promise.all([
+            api.fetchAllCitiesData(CITIES),
             api.fetchMarineData().catch(() => null),
         ]);
-
-        if (!results.every(r => r.status === 'fulfilled')) throw new Error("API Fehler");
-
-        const allData = results.map(r => r.value);
 
         // Cache speichern
         localStorage.setItem(CACHE_KEY_CITY, JSON.stringify(allData));
