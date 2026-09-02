@@ -410,8 +410,8 @@ export async function refresh() {
       ? '⚠️ API-Limit erreicht – Daten werden in Kürze nachgeladen.'
       : 'Regen-Vorhersage konnte nicht geladen werden.';
     showError(msg);
-    // Bei 429: automatisch nach 60 s nochmals versuchen
-    if (is429 && active) setTimeout(() => { if (active) refresh(); }, 60000);
+    // Bei 429: automatisch nach 5 Min nochmals versuchen (nicht früher – sonst Limit verlängern)
+    if (is429 && active) setTimeout(() => { if (active) refresh(); }, 300000);
   }
 }
 
@@ -443,9 +443,9 @@ export async function initRegen() {
   } catch (e) {
     console.warn('[regen] init:', e);
     updateNavButton(false);
-    // Bei 429: nach 60 s automatisch nochmal versuchen
+    // Bei 429: nach 5 Min automatisch nochmal versuchen
     if (String(e.message).includes('429')) {
-      setTimeout(() => refreshNavStatus().catch(() => {}), 60000);
+      setTimeout(() => refreshNavStatus().catch(() => {}), 300000);
     }
   }
 }

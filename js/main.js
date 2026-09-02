@@ -80,11 +80,12 @@ async function loadFromCache() {
 async function loadAll(silent = false) {
     try {
         ui.setStatus('loading');
-        // Batch-Versuch, Fallback auf Einzel-Requests
+        // Batch-Request; bei 429 sofort abbrechen (kein Fallback – der würde 4x weitere 429 erzeugen)
         let allData = null;
         try {
             allData = await api.fetchAllCitiesData(CITIES);
         } catch (batchErr) {
+            if (String(batchErr.message).includes('429')) throw batchErr; // direkt in catch-Block
             console.warn('[loadAll] Batch fehlgeschlagen, versuche Einzel-Requests:', batchErr);
             const results = await Promise.allSettled(CITIES.map(c => api.fetchCityData(c)));
             allData = results.map((r, i) => {
@@ -129,9 +130,9 @@ async function loadAll(silent = false) {
         console.error('[loadAll] Kritischer Fehler:', e);
         ui.setStatus('error');
         if (!silent) ui.showToast("Aktualisierung fehlgeschlagen. Zeige alte Daten.");
-        // Bei 429: nächsten Versuch in 60 s statt in 10 Min
-        if (String(e.message).includes('429') && remainingWeather > 60) {
-            remainingWeather = 60;
+        // Bei 429: nächsten Versuch in ~5 Min statt in 10 Min
+        if (String(e.message).includes('429') && remainingWeather > 300) {
+            remainingWeather = 300;
         }
     }
 }
