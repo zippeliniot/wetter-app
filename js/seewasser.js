@@ -567,10 +567,35 @@ export function getFSConfig() {
   const data = (typeof structuredClone === 'function')
     ? structuredClone(lastCfg.data)
     : JSON.parse(JSON.stringify(lastCfg.data));
+
+  // Detailansicht: Punkte auf echten Linien anzeigen (nicht auf Band-Hilfsdatasets)
+  data.datasets = data.datasets.map(ds => {
+    const isRealLine = ds.type !== 'bar' && !String(ds.label ?? '').startsWith('_') && (ds.borderWidth ?? 0) > 0;
+    if (isRealLine) return { ...ds, pointRadius: 3, pointHoverRadius: 6 };
+    return ds;
+  });
+
   return {
     type: lastCfg.type,
     data,
-    options: { ...lastCfg.options, plugins: { ...lastCfg.options.plugins }, scales: { ...lastCfg.options.scales } },
+    options: {
+      ...lastCfg.options,
+      plugins: {
+        ...lastCfg.options.plugins,
+        // Legende in Detailansicht einblenden; interne _-Datasets ausfiltern
+        legend: {
+          display: true,
+          labels: {
+            color: 'rgba(255,255,255,0.85)',
+            font: { size: 13 },
+            usePointStyle: true,
+            pointStyle: 'line',
+            filter: (item) => item.text && !item.text.startsWith('_'),
+          },
+        },
+      },
+      scales: { ...lastCfg.options.scales },
+    },
   };
 }
 
