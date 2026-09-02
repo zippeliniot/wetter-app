@@ -334,7 +334,8 @@ window.closeFS = () => {
 };
 
 window.manualRefresh = () => {
-    remaining = 15;
+    remainingRegen   = REGEN_INTERVAL;
+    remainingWeather = WEATHER_INTERVAL;
     if (regen.isActive()) {
         regen.refresh();
         return;
@@ -350,8 +351,8 @@ window.showMain = () => regen.hide();
 
 window.togglePause = () => {
     paused = !paused;
-    document.getElementById('pause-btn').textContent = paused ? 'Weiter' : 'Pause';
-    document.getElementById('pause-btn').style.background = paused ? 'rgba(255,184,48,0.20)' : '';
+    const btn = document.getElementById('pause-btn');
+    if (btn) { btn.textContent = paused ? 'Weiter' : 'Pause'; btn.style.background = paused ? 'rgba(255,184,48,0.20)' : ''; }
 };
 
 window.locateMe = () => {
@@ -381,13 +382,31 @@ window.showImpressum = () => { ui.dom.settingsMenu.classList.remove('open'); doc
 window.closeImpressum = () => { document.getElementById('impressum-overlay').classList.remove('open'); }
 
 // --- TIMER ---
-let remaining = 15, paused = false;
+// Regen-Nowcast: alle 2 Minuten (120 s) — leichte Single-Point-Abfrage
+// Wetter+Marine:  alle 10 Minuten (600 s) — vollständiger Batch-Abruf
+const REGEN_INTERVAL   = 120;
+const WEATHER_INTERVAL = 600;
+let remainingRegen   = REGEN_INTERVAL;
+let remainingWeather = WEATHER_INTERVAL;
+let paused = false;
+
 setInterval(() => {
     if (paused) return;
-    remaining--;
-    ui.dom.ringProgress.style.strokeDashoffset = (2 * Math.PI * 12) * (1 - remaining / 15);
-    ui.dom.countdownNum.textContent = remaining;
-    if (remaining <= 0) { remaining = 15; loadAll(true); regen.refreshNavStatus(); }
+    remainingRegen--;
+    remainingWeather--;
+
+    // Countdown-Ring zeigt Zeit bis zum nächsten Regen-Check
+    ui.dom.ringProgress.style.strokeDashoffset = (2 * Math.PI * 12) * (1 - remainingRegen / REGEN_INTERVAL);
+    ui.dom.countdownNum.textContent = remainingRegen;
+
+    if (remainingRegen <= 0) {
+        remainingRegen = REGEN_INTERVAL;
+        regen.refreshNavStatus();
+    }
+    if (remainingWeather <= 0) {
+        remainingWeather = WEATHER_INTERVAL;
+        loadAll(true);
+    }
 }, 1000);
 
 // --- INIT SEQUENCE ---
