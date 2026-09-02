@@ -130,9 +130,11 @@ async function loadAll(silent = false) {
         console.error('[loadAll] Kritischer Fehler:', e);
         ui.setStatus('error');
         if (!silent) ui.showToast("Aktualisierung fehlgeschlagen. Zeige alte Daten.");
-        // Bei 429: nächsten Versuch in ~5 Min statt in 10 Min
-        if (String(e.message).includes('429') && remainingWeather > 300) {
-            remainingWeather = 300;
+        // Bei 429: Status anzeigen und in 5 Min nochmal versuchen
+        if (String(e.message).includes('429')) {
+            const rem = api.rateLimitRemainingSeconds();
+            ui.dom.updatedText.textContent = `API-Limit – Retry in ${Math.ceil(rem / 60)} Min`;
+            if (remainingWeather > 300) remainingWeather = 300;
         }
     }
 }
