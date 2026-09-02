@@ -562,17 +562,59 @@ window.swYearDelta = (delta) => {
 window.swCmp = (k) => { if (k !== cmpSensor) { cmpSensor = k; render(); } };
 
 // ---------- Fullscreen (nutzt bestehendes #fs-modal via main.js) ----------
+
+// Plugin: Wert-Labels an Datenpunkten, 45°-Winkel, mit Mindestabstand gegen Überlappung.
+// Wird nur im Fullscreen-Config registriert.
+const fsDataLabelPlugin = {
+  id: 'fsDataLabels',
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+    const MIN_PX = 32; // Mindestabstand (px) zwischen zwei Labels desselben Datasets
+
+    chart.data.datasets.forEach((ds, dsIdx) => {
+      const label = String(ds.label ?? '');
+      // Nur echte Sensorlinien: keine internen (_), kein Mittelwert, keine Bars
+      if (label.startsWith('_') || label === 'Luft Ø' || ds.type === 'bar') return;
+      const meta = chart.getDatasetMeta(dsIdx);
+      if (meta.hidden || ds.hidden) return;
+
+      // Farbe aus borderColor ableiten
+      const col = typeof ds.borderColor === 'string' ? ds.borderColor : 'rgba(255,255,255,0.9)';
+      let lastX = -Infinity;
+
+      ctx.save();
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillStyle = col;
+
+      meta.data.forEach((pt, i) => {
+        const val = ds.data[i];
+        if (val == null || pt.x - lastX < MIN_PX) return;
+        lastX = pt.x;
+        ctx.save();
+        ctx.translate(pt.x + 5, pt.y - 5);
+        ctx.rotate(-Math.PI / 4); // 45° → oben-rechts
+        ctx.fillText(val.toFixed(1) + '°', 0, 0);
+        ctx.restore();
+      });
+
+      ctx.restore();
+    });
+  },
+};
+
 export function getFSConfig() {
   if (!lastCfg) return null;
   const data = (typeof structuredClone === 'function')
     ? structuredClone(lastCfg.data)
     : JSON.parse(JSON.stringify(lastCfg.data));
 
-  // Detailansicht: Punkte auf echten Linien anzeigen (nicht auf Band-Hilfsdatasets)
+  // Detailansicht: Punkte auf echten Sensorlinien; Luft Ø = berechneter Wert → keine Dots
   data.datasets = data.datasets.map(ds => {
-    const isRealLine = ds.type !== 'bar' && !String(ds.label ?? '').startsWith('_') && (ds.borderWidth ?? 0) > 0;
-    if (isRealLine) return { ...ds, pointRadius: 3, pointHoverRadius: 6 };
-    return ds;
+    const label = String(ds.label ?? '');
+    const isRealLine = ds.type !== 'bar' && !label.startsWith('_') && (ds.borderWidth ?? 0) > 0;
+    if (!isRealLine) return ds;
+    if (label === 'Luft Ø') return { ...ds, pointRadius: 0, pointHoverRadius: 3 };
+    return { ...ds, pointRadius: 3, pointHoverRadius: 6 };
   });
 
   return {
@@ -582,7 +624,7 @@ export function getFSConfig() {
       ...lastCfg.options,
       plugins: {
         ...lastCfg.options.plugins,
-        // Legende in Detailansicht einblenden; interne _-Datasets ausfiltern
+        // Legende einblenden; interne _-Datasets ausfiltern
         legend: {
           display: true,
           labels: {
@@ -596,6 +638,8 @@ export function getFSConfig() {
       },
       scales: { ...lastCfg.options.scales },
     },
+    // Wert-Labels als eigenes Plugin nur für diesen Chart
+    plugins: [...(lastCfg.plugins ?? []), fsDataLabelPlugin],
   };
 }
 
