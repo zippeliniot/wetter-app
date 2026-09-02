@@ -382,6 +382,19 @@ function showError(msg) {
     err.textContent = msg;
     err.style.display = 'block';
   }
+  // Lade-Platzhalter durch neutrale Werte ersetzen, damit kein
+  // „Wird geladen …"-Text neben der Fehlermeldung stehen bleibt.
+  setText('regen-meta',       '');
+  setText('regen-hero-label', '—');
+  setText('regen-verdict',    '—');
+  setText('regen-hero-feel',  'Keine Daten verfügbar.');
+  setText('regen-eta-main',   '—');
+  setText('regen-eta-sub',    '');
+  setText('regen-peak-main',  '—');
+  setText('regen-peak-sub',   '');
+  setText('regen-prox10',     '—');
+  setText('regen-prox5',      '—');
+  setText('regen-sum',        '—');
 }
 
 export async function refresh() {
