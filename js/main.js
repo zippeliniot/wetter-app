@@ -94,7 +94,14 @@ async function loadAll(silent = false) {
             });
         }
 
-        const marineRaw = await api.fetchMarineData().catch(() => null);
+        // Datenstruktur validieren – ungültige Einträge durch Cache ersetzen
+        allData = allData.map((d, i) => {
+            if (d && d.hourly && d.daily) return d;
+            console.warn(`[loadAll] Ungültige Datenstruktur für ${CITIES[i].name}:`, d);
+            return cachedData?.[i] ?? null;
+        });
+
+        const marineRaw = await api.fetchMarineData().catch(e => { console.warn('[loadAll] Marine-Daten fehlgeschlagen:', e); return null; });
 
         // Abbrechen nur wenn HH (0) UND GR (1) keine Daten haben
         if (!allData[0] && !allData[1]) throw new Error("Kernstädte HH+GR nicht erreichbar");
@@ -119,15 +126,18 @@ async function loadAll(silent = false) {
         ui.setStatus('ok');
         ui.dom.updatedText.textContent = 'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE');
     } catch (e) {
+        console.error('[loadAll] Kritischer Fehler:', e);
         ui.setStatus('error');
-        ui.showToast("Aktualisierung fehlgeschlagen. Zeige alte Daten.");
+        if (!silent) ui.showToast("Aktualisierung fehlgeschlagen. Zeige alte Daten.");
     }
 }
 
 function initCharts() {
     requestAnimationFrame(() => {
-        tempChart = new Chart(document.getElementById('temp-chart'), charts.getTempChartConfig(cachedData, currentRange, CITIES));
-        windChart = new Chart(document.getElementById('wind-chart'), charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', getWindCityIdx()));
+        const tempCfg = charts.getTempChartConfig(cachedData, currentRange, CITIES);
+        if (tempCfg) tempChart = new Chart(document.getElementById('temp-chart'), tempCfg);
+        const windCfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', getWindCityIdx());
+        if (windCfg) windChart = new Chart(document.getElementById('wind-chart'), windCfg);
         if (marineCache) {
             seaChart = new Chart(document.getElementById('sea-chart'), charts.getSeaChartConfig(marineCache, currentRange, CITIES));
         }
@@ -139,18 +149,22 @@ function initCharts() {
 function updateCharts() {
     if (tempChart) {
         const cfg = charts.getTempChartConfig(cachedData, currentRange, CITIES, 'temp-chart');
-        tempChart.data = cfg.data;
-        tempChart._isNight = cfg._isNight;
-        tempChart._symEvery = cfg._symEvery;
-        tempChart._N = cfg._N;
-        // Wichtig: 'none' verhindert Animationen beim Hintergrund-Update
-        tempChart.update('none');
+        if (cfg) {
+            tempChart.data = cfg.data;
+            tempChart._isNight = cfg._isNight;
+            tempChart._symEvery = cfg._symEvery;
+            tempChart._N = cfg._N;
+            // Wichtig: 'none' verhindert Animationen beim Hintergrund-Update
+            tempChart.update('none');
+        }
     }
     if (windChart) {
         const cfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', getWindCityIdx());
-        windChart.data = cfg.data;
-        windChart._isNight = cfg._isNight;
-        windChart.update('none');
+        if (cfg) {
+            windChart.data = cfg.data;
+            windChart._isNight = cfg._isNight;
+            windChart.update('none');
+        }
     }
     if (seaChart && marineCache) {
         const cfg = charts.getSeaChartConfig(marineCache, currentRange, CITIES, 'sea-chart');
@@ -206,9 +220,11 @@ function applyLocationFilter() {
     if (windChart && cachedData) {
         const wIdx = getWindCityIdx();
         const windCfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', wIdx);
-        windChart.data = windCfg.data;
-        windChart._isNight = windCfg._isNight;
-        windChart.update('none');
+        if (windCfg) {
+            windChart.data = windCfg.data;
+            windChart._isNight = windCfg._isNight;
+            windChart.update('none');
+        }
         // Titel der Wind-Card aktualisieren
         const windTitleEl = document.getElementById('wind-card-title');
         if (windTitleEl) windTitleEl.textContent = `Wind · ${CITIES[wIdx].name} km/h ↗`;
@@ -300,6 +316,8 @@ window.openFS = (type) => {
       title.textContent = "Ostsee Wassertemperatur";
       config = charts.getSeaChartConfig(marineCache, currentRange, CITIES, 'fs-canvas');
     }
+
+    if (!config) return; // Keine Daten verfügbar
 
     // Setze den FullScreen Flag für das Symbol-Plugin
     config.options.plugins.fullScreen = true;

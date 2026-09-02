@@ -13,7 +13,9 @@ export const dom = {
 };
 
 export function buildForecastShell(allData, cities) {
-    const days = allData[0].daily.time;
+    const refData = allData.find(d => d != null);
+    if (!refData) return;
+    const days = refData.daily.time;
     const dayLabels = days.map((t, i) => i === 0 ? 'Heute' : DN[new Date(t).getDay()]);
 
     dom.fcTable.innerHTML = `

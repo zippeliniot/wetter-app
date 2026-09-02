@@ -182,7 +182,9 @@ function getSharedTimeRange(timeArray, range) {
 }
 
 export function getTempChartConfig(allData, range, cities, canvasId = 'temp-chart') {
-    const { labels, nightArr, start, end, step } = getSharedTimeRange(allData[0].hourly.time, range);
+    const refData = allData.find(d => d != null);
+    if (!refData) { console.error('[getTempChartConfig] Keine gültigen Wetterdaten'); return null; }
+    const { labels, nightArr, start, end, step } = getSharedTimeRange(refData.hourly.time, range);
     const N = allData.length;
 
     const empty = Array(labels.length).fill(null);
@@ -257,7 +259,9 @@ export function getTempChartConfig(allData, range, cities, canvasId = 'temp-char
 }
 
 export function getWindChartConfig(allData, range, cities, canvasId = 'wind-chart', cityIdx = 1) {
-    const { labels, nightArr, start, end, step } = getSharedTimeRange(allData[0].hourly.time, range);
+    const refData = allData.find(d => d != null);
+    if (!refData) { console.error('[getWindChartConfig] Keine gültigen Wetterdaten'); return null; }
+    const { labels, nightArr, start, end, step } = getSharedTimeRange(refData.hourly.time, range);
     const ci = Math.min(cityIdx, allData.length - 1);
     // Fallback auf erste verfügbare Stadt wenn gewählte null ist
     const cityData = allData[ci] ?? allData.find(d => d != null);
