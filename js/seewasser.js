@@ -264,8 +264,27 @@ async function cfgDailyWindow(nDays, withBand) {
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(nDays), false) };
 }
 
+// Sensor-Hinweis-Element ein-/ausblenden (unter dem Chart-Wrapper)
+function showSensorNotice(missing) {
+  let el = document.getElementById('sw-sensor-notice');
+  if (!missing) { if (el) el.style.display = 'none'; return; }
+  if (!el) {
+    const wrap = swChartWrap();
+    if (!wrap || !wrap.parentNode) return;
+    el = document.createElement('p');
+    el.id = 'sw-sensor-notice';
+    el.style.cssText = 'font-size:0.8rem;color:rgba(255,184,48,0.85);margin:6px 0 0;padding:0 4px;';
+    wrap.parentNode.insertBefore(el, wrap.nextSibling);
+  }
+  el.textContent = '⚠️ Sensordaten fehlen – letzter verfügbarer Wert als gestrichelte Linie.';
+  el.style.display = '';
+}
+
 async function cfgMonat() {
-  const rec = monthRecords(await loadMonth(monthCursor));
+  // Monats-JSON laden; fehlt die Datei (neuer Monat / Sensor aus), rec bleibt leer
+  let rec = {};
+  try { rec = monthRecords(await loadMonth(monthCursor)); } catch (e) { /* Datei fehlt */ }
+
   const [y, m] = monthCursor.split('-').map(Number);
   const dim = new Date(y, m, 0).getDate();
   const labels = [], sw40m = [], swgrm = [], atMin = [], atMax = [], atAvg = [], lo = [], hi = [];
@@ -280,8 +299,42 @@ async function cfgMonat() {
     lo.push(r ? r.sw40.min : null);
     hi.push(r ? r.sw40.max : null);
   }
+
   const ds = [...band(hi, lo, C_SW40), line('40 cm', sw40m, C_SW40), line('Grund', swgrm, C_SWGR),
     ...atBand(atMin, atMax, atAvg)];
+
+  // Sensor ausgefallen? → letzten bekannten Wert aus Vormonaten als gestrichelte Referenz
+  const hasData = sw40m.some(v => v != null);
+  if (!hasData) {
+    let lastSw40 = null, lastSwgr = null;
+    // Bis zu 3 Vormonate durchsuchen
+    for (let delta = -1; delta >= -3 && (lastSw40 == null || lastSwgr == null); delta--) {
+      const prevKey = shiftYm(monthCursor, delta);
+      if (prevKey < FIRST_MONTH) break;
+      try {
+        const prevRec = monthRecords(await loadMonth(prevKey));
+        const [py, pm] = prevKey.split('-').map(Number);
+        const prevDim = new Date(py, pm, 0).getDate();
+        for (let d = prevDim; d >= 1; d--) {
+          const r = prevRec[d];
+          if (r && r.sw40.mean != null && lastSw40 == null) lastSw40 = r.sw40.mean;
+          if (r && r.swgr.mean != null && lastSwgr == null) lastSwgr = r.swgr.mean;
+          if (lastSw40 != null && lastSwgr != null) break;
+        }
+      } catch (e) { /* Vormonat auch nicht verfügbar */ }
+    }
+    const dashOpts = { borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, spanGaps: true };
+    if (lastSw40 != null)
+      ds.push({ ...dashOpts, label: '40 cm (letzter Wert)', data: new Array(dim).fill(lastSw40),
+        borderColor: hexA(C_SW40, 0.50), backgroundColor: 'transparent' });
+    if (lastSwgr != null)
+      ds.push({ ...dashOpts, label: 'Grund (letzter Wert)', data: new Array(dim).fill(lastSwgr),
+        borderColor: hexA(C_SWGR, 0.50), backgroundColor: 'transparent' });
+    showSensorNotice(true);
+  } else {
+    showSensorNotice(false);
+  }
+
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(dailyX(10), false) };
 }
 
@@ -399,6 +452,9 @@ async function render() {
   // Chart immer anzeigen; das alte #sw-now (Sofortanzeige) wird nicht mehr genutzt.
   if (wrap) wrap.style.display = '';
   if (nowEl) nowEl.style.display = 'none';
+
+  // Sensor-Hinweis ausblenden wenn nicht im Monat-View
+  if (activeTab !== 'monat') showSensorNotice(false);
 
   let cfg;
   try { cfg = await buildConfig(); }
