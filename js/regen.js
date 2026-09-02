@@ -392,7 +392,13 @@ export async function refresh() {
     render(model);
   } catch (e) {
     console.warn('[regen]', e);
-    showError('Regen-Vorhersage konnte nicht geladen werden.');
+    const is429 = e.message?.includes('429');
+    const msg = is429
+      ? '⚠️ API-Limit erreicht – Daten werden in Kürze nachgeladen.'
+      : 'Regen-Vorhersage konnte nicht geladen werden.';
+    showError(msg);
+    // Bei 429: automatisch nach 60 s nochmals versuchen
+    if (is429 && active) setTimeout(() => { if (active) refresh(); }, 60000);
   }
 }
 
