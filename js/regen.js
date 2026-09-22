@@ -16,7 +16,11 @@ const DIRS = [
   { code: 'W', ang: 270 },
   { code: 'NW', ang: 315 },
 ];
-const RING_KM = [5, 10, 20, 30];
+// Zusaetzlicher naher Ring (2 km) fuer feinere Detektion kurz vor dem Standort;
+// DIRS bleibt bei 8 Richtungen, um die Punktzahl (und damit die URL-Laenge
+// eines einzelnen Multi-Location-Requests) angesichts des Rate-Limit-Guards
+// in js/api.js moderat zu halten (41 statt 33 Punkte).
+const RING_KM = [2, 5, 10, 20, 30];
 
 let chart = null;
 let lastModel = null;
@@ -78,6 +82,7 @@ function buildModel(responses, points, now = Date.now()) {
   const site = Array.isArray(responses) ? responses[0] : responses;
   const times = site.minutely_15.time;
   const sitePrecip = site.minutely_15.precipitation;
+  const siteProb = site.minutely_15.precipitation_probability || [];
 
   const timeline = times.map((t, i) => {
     const mmh = mm15ToMmh(sitePrecip[i]);
@@ -88,6 +93,7 @@ function buildModel(responses, points, now = Date.now()) {
       minutes_from_now: minutesFromNow(t, now) ?? i * 15,
       site_mm15: sitePrecip[i] ?? 0,
       site_mmh: mmh,
+      site_prob: siteProb[i] ?? null,
       is_raining: mmh >= RAIN_MMH,
       site_class: cls.class,
       site_feel: cls.feel,
@@ -148,7 +154,8 @@ function buildModel(responses, points, now = Date.now()) {
     // Als „kurz" gilt Regen an ≤ 3 Zeitschritten (≤ 45 Minuten).
     const short = timeline.filter(s => s.is_raining).length <= 3;
     verdict = (short ? 'Kurzer ' : '') + peakCls.verdict;
-    heroFeel = `${verdict} ab ca. ${onset.cest} Uhr. ${peakCls.feel}`;
+    const probTxt = onset.site_prob != null ? ` (${onset.site_prob}% Wahrscheinlichkeit)` : '';
+    heroFeel = `${verdict} ab ca. ${onset.cest} Uhr${probTxt}. ${peakCls.feel}`;
   } else if (approach) {
     verdict = 'Regen in der Nähe';
     heroFeel = `Front aus ${approach.dir} (~${Math.round(approach.km)} km). Am Ort in den nächsten 2 Stunden noch kein Niederschlag.`;
@@ -171,6 +178,7 @@ function buildModel(responses, points, now = Date.now()) {
       cest: timeline[peak.i]?.cest,
       class: peakCls.class,
       feel: peakCls.feel,
+      prob: timeline[peak.i]?.site_prob ?? null,
     },
     sumMm,
     prox10,
@@ -253,6 +261,7 @@ function renderChart(model) {
 
   const labels = model.timeline.map(s => s.cest);
   const data = model.timeline.map(s => (s.site_mmh >= RAIN_MMH ? s.site_mmh : null));
+  const probs = model.timeline.map(s => s.site_prob);
   const beginIdx = model.onset ? model.timeline.indexOf(model.onset) : -1;
   const vmax = Math.max(1.0, ...model.timeline.map(s => s.site_mmh), 0.1) * 1.25;
 
@@ -279,7 +288,11 @@ function renderChart(model) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => ctx.parsed.y == null ? 'trocken' : `${ctx.parsed.y.toFixed(2)} mm/h`,
+            label: (ctx) => {
+              const prob = probs[ctx.dataIndex];
+              const probTxt = prob != null ? ` (${prob}% Wahrscheinlichkeit)` : '';
+              return ctx.parsed.y == null ? `trocken${probTxt}` : `${ctx.parsed.y.toFixed(2)} mm/h${probTxt}`;
+            },
           },
         },
       },
@@ -359,7 +372,8 @@ function render(model) {
 
   if (model.peak.mmh >= RAIN_MMH) {
     setText('regen-peak-main', `${model.peak.mmh.toFixed(1)} mm/h`);
-    setText('regen-peak-sub', `${model.peak.class} · ${model.peak.cest}`);
+    const probTxt = model.peak.prob != null ? ` · ${model.peak.prob}%` : '';
+    setText('regen-peak-sub', `${model.peak.class} · ${model.peak.cest}${probTxt}`);
   } else {
     setText('regen-peak-main', '0 mm/h');
     setText('regen-peak-sub', 'trocken');

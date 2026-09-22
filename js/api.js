@@ -88,7 +88,7 @@ export async function fetchRegenNowcast(points) {
     const p = new URLSearchParams({
       latitude: points.map(x => x.lat).join(','),
       longitude: points.map(x => x.lon).join(','),
-      minutely_15: 'precipitation',
+      minutely_15: 'precipitation,precipitation_probability',
       forecast_minutely_15: '8',
       timezone: 'Europe/Berlin',
     });
