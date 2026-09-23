@@ -118,6 +118,7 @@ async function loadAll(silent = false) {
             ui.buildForecastShell(cachedData, CITIES);
             ui.updateForecastValues(cachedData, CITIES);
             initCharts(); // Ruft am Ende auch applyLocationFilter auf
+            updateSeaHeader();
             shellBuilt = true;
         } else {
             ui.updateForecastValues(cachedData, CITIES);

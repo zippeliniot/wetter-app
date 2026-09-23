@@ -103,11 +103,13 @@ function buildModel(responses, points, now = Date.now()) {
   let onset = null;
   let peak = { mmh: 0, i: 0 };
   let sumMm = 0;
+  let maxProb = null;
   for (let i = 0; i < timeline.length; i++) {
     const s = timeline[i];
     sumMm += s.site_mm15;
     if (s.site_mmh > peak.mmh) peak = { mmh: s.site_mmh, i };
     if (onset == null && s.is_raining) onset = s;
+    if (s.site_prob != null && (maxProb == null || s.site_prob > maxProb)) maxProb = s.site_prob;
   }
 
   const list = Array.isArray(responses) ? responses : [responses];
@@ -181,6 +183,7 @@ function buildModel(responses, points, now = Date.now()) {
       prob: timeline[peak.i]?.site_prob ?? null,
     },
     sumMm,
+    maxProb,
     prox10,
     prox5,
     approach,
@@ -361,6 +364,7 @@ function render(model) {
   setText('regen-hero-label', `${model.nowCest} – ${model.endCest} Uhr`);
   setText('regen-verdict', model.verdict);
   setText('regen-hero-feel', model.heroFeel);
+  setText('regen-prob-main', model.maxProb != null ? `${model.maxProb}%` : '—');
 
   if (model.onset) {
     setText('regen-eta-main', model.onset.cest);
@@ -402,6 +406,7 @@ function showError(msg) {
   setText('regen-hero-label', '—');
   setText('regen-verdict',    '—');
   setText('regen-hero-feel',  'Keine Daten verfügbar.');
+  setText('regen-prob-main',  '—');
   setText('regen-eta-main',   '—');
   setText('regen-eta-sub',    '');
   setText('regen-peak-main',  '—');
