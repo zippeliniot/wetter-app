@@ -1,4 +1,4 @@
-import { CITIES, COL, REGEN_SITES } from './config.js';
+import { CITIES, COL, REGEN_SITES, ABBR } from './config.js';
 import * as api from './api.js';
 // Hinweis: fetchCityData wird nicht mehr direkt verwendet – Batch via fetchAllCitiesData
 import * as ui from './ui.js';
@@ -70,6 +70,8 @@ async function loadFromCache() {
         // 3. Charts initialisieren mit Cache-Daten
         initCharts();
         updateSeaHeader();
+        updateTempHeader();
+        updateWindHeader();
 
         // Status auf "Lade aktuelle Daten..."
         ui.setStatus('loading');
@@ -119,10 +121,14 @@ async function loadAll(silent = false) {
             ui.updateForecastValues(cachedData, CITIES);
             initCharts(); // Ruft am Ende auch applyLocationFilter auf
             updateSeaHeader();
+            updateTempHeader();
+            updateWindHeader();
             shellBuilt = true;
         } else {
             ui.updateForecastValues(cachedData, CITIES);
             updateCharts(); // Ruft jetzt explizit applyLocationFilter auf
+            updateTempHeader();
+            updateWindHeader();
         }
 
         ui.setStatus('ok');
@@ -204,6 +210,28 @@ function updateSeaHeader() {
     const cur = values.find(v => v != null);
     const wave = waveVals.find(v => v != null);
     ui.dom.seaCurrent.textContent = [cur != null ? Math.round(cur * 10) / 10 + ' °C' : null, wave != null ? '〰 ' + Math.round(wave * 100) + ' cm' : null].filter(Boolean).join('  ');
+}
+
+function updateTempHeader() {
+    const el = document.getElementById('temp-current');
+    if (!el) return;
+    const idx = getWindCityIdx();
+    const cur = cachedData?.[idx]?.current;
+    if (!cur || cur.temperature_2m == null) { el.textContent = ''; return; }
+    const abbr = ABBR[CITIES[idx].name] || '';
+    const temp = Math.round(cur.temperature_2m * 10) / 10;
+    const precip = cur.precipitation != null ? Math.round(cur.precipitation * 10) / 10 : null;
+    el.textContent = [(abbr + ' ' + temp + '°').trim(), precip != null ? precip + ' mm' : null].filter(Boolean).join(' · ');
+}
+
+function updateWindHeader() {
+    const el = document.getElementById('wind-current');
+    if (!el) return;
+    const cur = cachedData?.[1]?.current;
+    if (!cur || cur.wind_speed_10m == null) { el.textContent = ''; return; }
+    const speed = Math.round(cur.wind_speed_10m);
+    const dir = cur.wind_direction_10m != null ? utils.getWindDir(cur.wind_direction_10m) : null;
+    el.textContent = [speed + ' km/h', dir].filter(Boolean).join(' ');
 }
 
 function applyLocationFilter() {
@@ -300,6 +328,8 @@ window.setLocation = (loc) => {
     // Regen-Nowcast-Standort synchron halten (bei 'all' → Gronenberg)
     regen.setSite(loc === 'all' ? 'Gronenberg' : loc);
     applyLocationFilter();
+    updateTempHeader();
+    updateWindHeader();
 };
 
 window.openFS = (type) => {
