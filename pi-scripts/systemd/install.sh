@@ -10,6 +10,8 @@ UNITS=(
   climac-live-export.service    climac-live-export.timer
   climac-daily-export.service   climac-daily-export.timer
   climac-history-export.service climac-history-export.timer
+  climac-tanken-stations.service climac-tanken-stations.timer
+  climac-tanken-prices.service   climac-tanken-prices.timer
 )
 
 for u in "${UNITS[@]}"; do
@@ -19,7 +21,7 @@ done
 
 systemctl daemon-reload
 
-for t in climac-live-export climac-daily-export climac-history-export; do
+for t in climac-live-export climac-daily-export climac-history-export climac-tanken-stations climac-tanken-prices; do
   systemctl enable --now "$t.timer"
   echo "aktiviert:   $t.timer"
 done
