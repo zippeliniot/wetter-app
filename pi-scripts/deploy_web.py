@@ -19,7 +19,7 @@ WEB_FILES = [
     "index.html", "CNAME",
     "js/config.js", "js/api.js", "js/utils.js", "js/ui.js",
     "js/charts.js", "js/main.js", "js/seewasser.js", "js/blitz.js",
-    "js/regen.js",
+    "js/regen.js", "js/tanken.js",
 ]
 
 
