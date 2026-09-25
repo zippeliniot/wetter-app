@@ -7,6 +7,7 @@ import * as charts from './charts.js';
 import * as seewasser from './seewasser.js';
 import * as blitz from './blitz.js';
 import * as regen from './regen.js';
+import * as tanken from './tanken.js';
 
 // --- STATE ---
 let currentRange = 1;
@@ -386,6 +387,10 @@ window.manualRefresh = () => {
 
 window.showRegen = () => regen.show();
 window.showMain = () => regen.hide();
+
+window.showTanken = () => tanken.show();
+window.hideTanken = () => tanken.hide();
+window.tankenSetSort = (key) => tanken.setSort(key);
 
 window.togglePause = () => {
     paused = !paused;

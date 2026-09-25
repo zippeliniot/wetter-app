@@ -129,6 +129,18 @@
       .regen-stat-main { font-size: 1.2rem; }
       h1 { font-size: 1.15rem; letter-spacing: 2px; }
     }
+    /* --- Tankstellen-Karte --- */
+    .tanken-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tanken-row.closed { opacity: 0.45; }
+    .tanken-name { font-weight: 700; font-size: 0.92rem; }
+    .tanken-addr { font-size: 0.76rem; opacity: 0.7; margin-top: 2px; }
+    .tanken-dist { font-size: 0.72rem; opacity: 0.6; margin-top: 2px; }
+    .tanken-prices { display: flex; gap: 12px; text-align: right; }
+    .tanken-price-lbl { font-size: 0.62rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.5px; }
+    .tanken-price { font-size: 0.95rem; font-weight: 700; min-width: 56px; }
+    .tanken-badge { font-size: 0.66rem; padding: 2px 8px; border-radius: 50px; margin-left: 6px; white-space: nowrap; }
+    .tanken-badge.open { background: rgba(74,222,128,0.18); color: #4ade80; }
+    .tanken-badge.closed { background: rgba(239,68,68,0.18); color: #ef4444; }
   </style>
 </head>
 <body>
@@ -226,6 +238,33 @@
     </div>
 
     <p class="regen-footnote">Nowcast · inkl. Regenwahrscheinlichkeit % · Update ~15 Min</p>
+  </div>
+
+  <div class="header-bar hidden" id="tanken-header">
+    <div>
+      <h1>Tankstellen · Umkreis</h1>
+      <div class="regen-sub" id="tanken-loc">—</div>
+    </div>
+    <button class="nav-btn" id="btn-tanken-back" onclick="window.hideTanken()" title="Zurück zur Übersicht" aria-label="Zurück zur Wetterübersicht">Zurück</button>
+  </div>
+
+  <div id="tanken-view" class="hidden">
+    <div class="card">
+      <div class="range-toggle" role="group" aria-label="Sortierung wählen" id="tanken-sort-toggle">
+        <button class="range-btn active" data-sort="e5" onclick="window.tankenSetSort('e5')">E5</button>
+        <button class="range-btn" data-sort="e10" onclick="window.tankenSetSort('e10')">E10</button>
+        <button class="range-btn" data-sort="diesel" onclick="window.tankenSetSort('diesel')">Diesel</button>
+      </div>
+    </div>
+
+    <p class="regen-error" id="tanken-error"></p>
+
+    <div id="tanken-list"></div>
+
+    <p class="regen-footnote">
+      <a href="https://creativecommons.tankerkoenig.de" target="_blank" rel="noopener" style="color:inherit;">Daten von Tankerkoenig</a>
+      · Stand: <span id="tanken-updated">—</span>
+    </p>
   </div>
 
   <div id="main-view">
