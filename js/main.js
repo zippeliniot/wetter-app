@@ -351,6 +351,9 @@ window.openFS = (type) => {
       if (!c) return;
       title.textContent = "Taschensee Gronenberg";
       config = c;
+    } else if (type === 'tanken') {
+      title.textContent = "Tankstellenpreise Verlauf";
+      config = tanken.getFSConfig();
     } else {
       title.textContent = "Ostsee Wassertemperatur";
       config = charts.getSeaChartConfig(marineCache, currentRange, CITIES, 'fs-canvas');
@@ -391,6 +394,9 @@ window.showMain = () => regen.hide();
 window.showTanken = () => tanken.show();
 window.hideTanken = () => tanken.hide();
 window.tankenSetSort = (key) => tanken.setSort(key);
+window.tankenSetRange = (days) => tanken.setRange(days);
+window.tankenToggleSettings = (e) => tanken.toggleSettings(e);
+window.tankenPrefsChanged = () => tanken.prefsChanged();
 
 window.togglePause = () => {
     paused = !paused;
@@ -429,14 +435,17 @@ window.closeImpressum = () => { document.getElementById('impressum-overlay').cla
 // Wetter+Marine:  alle 10 Minuten (600 s) — vollständiger Batch-Abruf
 const REGEN_INTERVAL   = 120;
 const WEATHER_INTERVAL = 600;
+const TANKEN_INTERVAL  = 300; // 5 Min — Preis-Update-Timer auf dem Pi laeuft alle 15 Min
 let remainingRegen   = REGEN_INTERVAL;
 let remainingWeather = WEATHER_INTERVAL;
+let remainingTanken  = TANKEN_INTERVAL;
 let paused = false;
 
 setInterval(() => {
     if (paused) return;
     remainingRegen--;
     remainingWeather--;
+    remainingTanken--;
 
     // Countdown-Ring zeigt Zeit bis zum nächsten Regen-Check
     ui.dom.ringProgress.style.strokeDashoffset = (2 * Math.PI * 12) * (1 - remainingRegen / REGEN_INTERVAL);
@@ -452,6 +461,10 @@ setInterval(() => {
     if (remainingWeather <= 0) {
         remainingWeather = WEATHER_INTERVAL;
         loadAll(true);
+    }
+    if (remainingTanken <= 0) {
+        remainingTanken = TANKEN_INTERVAL;
+        tanken.refresh();
     }
 }, 1000);
 

@@ -12,6 +12,12 @@ Fehlt der Cache (noch kein taeglicher Lauf gelaufen): sauber ueberspringen
 und loggen, kein Crash (Exit 0).
 
 Tankerkoenig erlaubt max. 10 Stations-IDs je prices.php-Call -> Chunking.
+Zusaetzlich wird nach jedem Preis-Update ein kompakter Verlaufspunkt an
+data/tanken_history.json angehaengt (Teil A WETTER-0007): bestehende Datei
+per SFTP herunterladen (falls vorhanden), Punkt anhaengen, alle Punkte
+aelter als RETAINED_DAYS (Vergleich ueber Zeitstempel) verwerfen, wieder
+hochladen. Schlaegt das fehl, wird nur geloggt — data/tanken.json (der
+Preis-Stand selbst) haengt nicht davon ab.
 """
 from __future__ import annotations
 
@@ -21,7 +27,7 @@ import os
 import sys
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from climac_sftp import ClimacSFTP
 from export_tanken_stations import (
@@ -38,6 +44,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(SCRIPT_DIR, "logs", "export_tanken_prices.log")
 
 CHUNK_SIZE = 10
+
+HISTORY_LOCAL_FILE = "/tmp/climac_tanken_history.json"
+HISTORY_REMOTE_NAME = "tanken_history.json"
+RETAINED_DAYS = 3
 
 log = logging.getLogger("export_tanken_prices")
 
@@ -66,6 +76,51 @@ def _prices_php(api_key: str, ids: list[str]) -> dict:
     if not payload.get("ok"):
         raise RuntimeError(f"prices.php fehlgeschlagen: {payload}")
     return payload.get("prices", {})
+
+
+def _collect_prices(out_groups: list[dict]) -> dict:
+    prices: dict = {}
+    for group in out_groups:
+        for st in group.get("stations", []):
+            sid = st.get("id")
+            if not sid:
+                continue
+            prices[sid] = {"e5": st.get("e5"), "e10": st.get("e10"), "diesel": st.get("diesel")}
+    return prices
+
+
+def _append_history(sftp: ClimacSFTP, updated_at: str, prices: dict) -> None:
+    """Haengt einen Verlaufspunkt an tanken_history.json an (Download, anhaengen,
+    Trimmen auf RETAINED_DAYS ueber Zeitstempel, Upload). Existiert die Datei noch
+    nicht (erster Lauf), wird sie frisch angelegt."""
+    points: list = []
+    if sftp.download_file(HISTORY_REMOTE_NAME, HISTORY_LOCAL_FILE):
+        try:
+            with open(HISTORY_LOCAL_FILE, "r") as fh:
+                existing = json.load(fh)
+            if isinstance(existing.get("points"), list):
+                points = existing["points"]
+        except (json.JSONDecodeError, OSError):
+            log.warning("tanken_history.json vorhanden, aber nicht lesbar — neu angelegt")
+
+    points.append({"t": updated_at, "prices": prices})
+
+    cutoff = datetime.fromisoformat(updated_at) - timedelta(days=RETAINED_DAYS)
+    kept = []
+    for pt in points:
+        try:
+            t = datetime.fromisoformat(pt["t"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if t >= cutoff:
+            kept.append(pt)
+
+    history = {"updated_at": updated_at, "retained_days": RETAINED_DAYS, "points": kept}
+    with open(HISTORY_LOCAL_FILE, "w") as fh:
+        json.dump(history, fh, separators=(",", ":"), ensure_ascii=False)
+
+    remote = sftp.upload_file(HISTORY_LOCAL_FILE, HISTORY_REMOTE_NAME)
+    log.info("Historie aktualisiert -> %s (%d Punkte)", remote, len(kept))
 
 
 def main() -> int:
@@ -124,6 +179,11 @@ def main() -> int:
         with ClimacSFTP() as s:
             remote = s.upload_file(OUT_FILE, REMOTE_NAME)
             log.info("Upload OK -> %s", remote)
+
+            try:
+                _append_history(s, payload["updated_at"], _collect_prices(out_groups))
+            except Exception:
+                log.exception("Historie-Update fehlgeschlagen (tanken.json bleibt unberuehrt)")
 
         log.info("=== export_tanken_prices done ===")
         return 0

@@ -245,7 +245,21 @@
       <h1>Tankstellen · Umkreis</h1>
       <div class="regen-sub" id="tanken-loc">—</div>
     </div>
-    <button class="nav-btn" id="btn-tanken-back" onclick="window.hideTanken()" title="Zurück zur Übersicht" aria-label="Zurück zur Wetterübersicht">Zurück</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="settings-wrap">
+        <button class="settings-btn" id="tanken-settings-btn" onclick="window.tankenToggleSettings(event)" title="Chart-Einstellungen" aria-label="Chart-Einstellungen öffnen">⚙</button>
+        <div class="settings-menu" id="tanken-settings-menu">
+          <div class="sm-item" style="font-weight:700;opacity:0.7;cursor:default;">Stationen</div>
+          <div id="tanken-station-checks"></div>
+          <div class="sm-sep"></div>
+          <div class="sm-item" style="font-weight:700;opacity:0.7;cursor:default;">Sorten</div>
+          <label class="sm-item" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="tanken-fuel-e5" onchange="window.tankenPrefsChanged()"> E5</label>
+          <label class="sm-item" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="tanken-fuel-e10" onchange="window.tankenPrefsChanged()"> E10</label>
+          <label class="sm-item" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="tanken-fuel-diesel" onchange="window.tankenPrefsChanged()"> Diesel</label>
+        </div>
+      </div>
+      <button class="nav-btn" id="btn-tanken-back" onclick="window.hideTanken()" title="Zurück zur Übersicht" aria-label="Zurück zur Wetterübersicht">Zurück</button>
+    </div>
   </div>
 
   <div id="tanken-view" class="hidden">
@@ -260,6 +274,16 @@
     <p class="regen-error" id="tanken-error"></p>
 
     <div id="tanken-list"></div>
+
+    <div class="card">
+      <div class="chart-head">
+        <span class="card-title" onclick="window.openFS('tanken')">Preisverlauf ↗</span>
+        <div class="range-toggle" role="group" aria-label="Zeitraum Preisverlauf" id="tanken-range-toggle">
+          <button class="range-btn active" data-range="1" onclick="window.tankenSetRange(1)">1 Tag</button>
+          <button class="range-btn" data-range="3" onclick="window.tankenSetRange(3)">3 Tage</button>
+        </div>
+      </div>
+    </div>
 
     <p class="regen-footnote">
       <a href="https://creativecommons.tankerkoenig.de" target="_blank" rel="noopener" style="color:inherit;">Daten von Tankerkoenig</a>
