@@ -31,6 +31,7 @@ from export_tanken_stations import (
     REMOTE_NAME,
     STATIONS_CACHE_FILE,
     _get_api_key,
+    _num_or_none,
 )
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -97,9 +98,9 @@ def main() -> int:
                 full_stations.append({
                     **st,
                     "isOpen": p.get("status") == "open",
-                    "diesel": p.get("diesel"),
-                    "e5": p.get("e5"),
-                    "e10": p.get("e10"),
+                    "diesel": _num_or_none(p.get("diesel")),
+                    "e5": _num_or_none(p.get("e5")),
+                    "e10": _num_or_none(p.get("e10")),
                 })
 
             out_groups.append({

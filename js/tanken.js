@@ -6,7 +6,7 @@ let stations = [];
 let sortKey = 'e5';
 
 function fmtPrice(v) {
-  return v == null ? '—' : `${v.toFixed(3).replace('.', ',')} €`;
+  return typeof v !== 'number' ? '—' : `${v.toFixed(3).replace('.', ',')} €`;
 }
 
 function fmtDist(km) {
@@ -27,9 +27,11 @@ function render() {
   const sorted = [...stations].sort((a, b) => {
     const av = a[sortKey];
     const bv = b[sortKey];
-    if (av == null && bv == null) return 0;
-    if (av == null) return 1;
-    if (bv == null) return -1;
+    const aNum = typeof av === 'number';
+    const bNum = typeof bv === 'number';
+    if (!aNum && !bNum) return 0;
+    if (!aNum) return 1;
+    if (!bNum) return -1;
     return av - bv;
   });
 

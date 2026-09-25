@@ -98,13 +98,17 @@ def _station_master(st: dict) -> dict:
     }
 
 
+def _num_or_none(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
 def _station_full(st: dict) -> dict:
     full = _station_master(st)
     full.update({
         "isOpen": bool(st.get("isOpen")),
-        "diesel": st.get("diesel"),
-        "e5": st.get("e5"),
-        "e10": st.get("e10"),
+        "diesel": _num_or_none(st.get("diesel")),
+        "e5": _num_or_none(st.get("e5")),
+        "e10": _num_or_none(st.get("e10")),
     })
     return full
 
