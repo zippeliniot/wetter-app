@@ -16,7 +16,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; background: linear-gradient(160deg, #0f2540 0%, #1a4a7a 55%, #2d7ab5 100%); color: #fff; padding: 16px 12px 36px; overflow-x: hidden; }
     .page { max-width: 760px; margin: 0 auto; }
-    .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .header-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; row-gap: 8px; margin-bottom: 12px; }
     h1 { font-size: 1.35rem; font-weight: 300; letter-spacing: 3px; text-transform: uppercase; margin: 0; }
     .card { background: rgba(255,255,255,0.09); backdrop-filter: blur(14px); border-radius: 18px; border: 1px solid rgba(255,255,255,0.14); padding: 10px 12px; margin-bottom: 8px; }
     .chart-wrapper { position: relative; width: 100%; margin-top: 10px; }
@@ -40,6 +40,7 @@
     .fc-lbl-txt { font-size: 0.75rem; opacity: 0.75; margin-left: 3px; vertical-align: middle; }
     .fc-time { font-size: 0.70rem; opacity: 0.80; }
     .chart-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .chart-head-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .chart-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; }
     .cl-item { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; opacity: 0.95; }
     .cl-line { width: 16px; height: 2px; border-radius: 2px; }
@@ -128,6 +129,9 @@
       .regen-grid-3 { grid-template-columns: 1fr; }
       .regen-stat-main { font-size: 1.2rem; }
       h1 { font-size: 1.15rem; letter-spacing: 2px; }
+      .header-bar .range-toggle .range-btn { padding: 6px 14px; font-size: 0.8rem; }
+      .chart-head { flex-direction: column; align-items: flex-start; }
+      .chart-head-value { align-items: flex-start; }
     }
     /* --- Tankstellen-Karte --- */
     .tanken-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -321,7 +325,7 @@
   <div class="card" id="temp-card">
     <div class="chart-head">
       <span class="card-title" onclick="window.openFS('temp')">Temperatur &amp; Niederschlag ↗</span>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+      <div class="chart-head-value">
         <span id="temp-current" style="font-size:1.05rem;font-weight:700;opacity:0.9;"></span>
         <div class="chart-legend">
           <div class="cl-item" id="leg-hh-temp"><div class="cl-line" style="background:#FFB830;"></div><span style="color:#FFB830;">HH Temp.</span></div>
@@ -341,7 +345,7 @@
   <div class="card" id="wind-card">
     <div class="chart-head">
       <span class="card-title" id="wind-card-title" onclick="window.openFS('wind')">Wind · Gronenberg km/h ↗</span>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+      <div class="chart-head-value">
         <span id="wind-current" style="font-size:1.05rem;font-weight:700;opacity:0.9;"></span>
         <div class="wind-thr">
           <div class="wt-item"><div class="wt-dot" style="background:#4ade80;"></div>≤ 15</div>
@@ -357,7 +361,7 @@
   <div class="card" id="taschensee-card">
     <div class="chart-head">
       <span class="card-title" onclick="window.openFS('seewasser')">Taschensee ↗</span>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+      <div class="chart-head-value">
         <span id="sw-current" style="font-size:1.05rem;font-weight:700;opacity:0.9;"></span>
         <div class="sw-legend" id="sw-legend">
           <div class="cl-item"><div class="cl-line" style="background:#00C8DC;"></div><span style="color:#00C8DC;">40 cm</span></div>
@@ -381,7 +385,9 @@
   <div class="card" id="sea-card">
     <div class="chart-head">
       <span class="card-title" onclick="window.openFS('sea')">Ostsee · Scharbeutz ↗</span>
-      <span id="sea-current" style="font-size:1.05rem;font-weight:700;opacity:0.9;"></span>
+      <div class="chart-head-value">
+        <span id="sea-current" style="font-size:1.05rem;font-weight:700;opacity:0.9;"></span>
+      </div>
     </div>
     <div class="chart-wrapper" style="height: 220px;"><canvas id="sea-chart"></canvas></div>
   </div>
