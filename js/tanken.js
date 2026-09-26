@@ -10,6 +10,14 @@ const FUEL_LABEL = { e5: 'E5', e10: 'E10', diesel: 'Diesel' };
 
 const SORT_ORDER = ['e5', 'e10', 'diesel'];
 
+/** Wandelt ein Hex-Farbe (#rrggbb) in rgba(...) mit gegebener Deckkraft um. */
+function withAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 let active = false;
 let stations = [];
 let sortKey = 'e10'; // Default passend zu DEFAULT_FUELS (E5 ist per Default nicht angezeigt)
@@ -319,14 +327,16 @@ export function getFSConfig() {
         return typeof v === 'number' ? v : null;
       });
       if (data.every(v => v == null)) continue;
+      const color = STATION_COLORS[stationIndex(sid) % STATION_COLORS.length];
       datasets.push({
         label: `${stationLabel(sid)} · ${FUEL_LABEL[fuel] ?? fuel}`,
         data,
-        borderColor: STATION_COLORS[stationIndex(sid) % STATION_COLORS.length],
-        backgroundColor: 'transparent',
+        borderColor: color,
+        backgroundColor: withAlpha(color, 0.12),
+        fill: 'origin',
         borderWidth: 2,
         borderDash: FUEL_DASH[fuel] ?? [],
-        pointRadius: 2,
+        pointRadius: chartRange === 1 ? 2 : 0,
         pointHoverRadius: 4,
         spanGaps: true,
         tension: 0.2,
@@ -360,7 +370,7 @@ export function getFSConfig() {
           grid: { color: 'rgba(255,255,255,0.08)' },
         },
         y: {
-          ticks: { color: 'rgba(255,255,255,0.85)', callback: v => Number(v).toFixed(2) + ' €' },
+          ticks: { color: 'rgba(255,255,255,0.85)', callback: v => Number(v).toFixed(3) + ' €' },
           grid: { color: 'rgba(255,255,255,0.08)' },
         },
       },

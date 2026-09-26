@@ -49,6 +49,8 @@ HISTORY_LOCAL_FILE = "/tmp/climac_tanken_history.json"
 HISTORY_REMOTE_NAME = "tanken_history.json"
 RETAINED_DAYS = 3
 
+OLD_PRICES_LOCAL_FILE = "/tmp/climac_tanken_old.json"
+
 log = logging.getLogger("export_tanken_prices")
 
 
@@ -87,6 +89,34 @@ def _collect_prices(out_groups: list[dict]) -> dict:
                 continue
             prices[sid] = {"e5": st.get("e5"), "e10": st.get("e10"), "diesel": st.get("diesel")}
     return prices
+
+
+def _load_old_prices(sftp: ClimacSFTP) -> dict:
+    """Laedt den aktuell live stehenden data/tanken.json-Stand herunter und baut
+    daraus Station-ID -> {diesel, e5, e10, isOpen} als Fallback fuer Stationen,
+    die in einem prices.php-Zyklus komplett fehlen. Schlaegt der Download fehl
+    oder existiert die Datei noch nicht (erster Lauf ueberhaupt), wird ein leeres
+    dict zurueckgegeben (kein Rueckfall moeglich, Verhalten wie bisher)."""
+    old_prices: dict = {}
+    if not sftp.download_file(REMOTE_NAME, OLD_PRICES_LOCAL_FILE):
+        return old_prices
+    try:
+        with open(OLD_PRICES_LOCAL_FILE, "r") as fh:
+            old_payload = json.load(fh)
+        for group in old_payload.get("groups", []):
+            for st in group.get("stations", []):
+                sid = st.get("id")
+                if sid:
+                    old_prices[sid] = {
+                        "diesel": st.get("diesel"),
+                        "e5": st.get("e5"),
+                        "e10": st.get("e10"),
+                        "isOpen": st.get("isOpen"),
+                    }
+    except (json.JSONDecodeError, OSError):
+        log.warning("tanken.json vorhanden, aber nicht lesbar — alter Preis-Stand unbenutzt")
+        return {}
+    return old_prices
 
 
 def _append_history(sftp: ClimacSFTP, updated_at: str, prices: dict) -> None:
@@ -138,45 +168,62 @@ def main() -> int:
 
         api_key = _get_api_key()
 
-        out_groups = []
-        for group in cache.get("groups", []):
-            stations = group.get("stations", [])
-            ids = [st["id"] for st in stations if st.get("id")]
-
-            prices_by_id: dict = {}
-            for chunk in _chunks(ids, CHUNK_SIZE):
-                prices_by_id.update(_prices_php(api_key, chunk))
-
-            full_stations = []
-            for st in stations:
-                p = prices_by_id.get(st["id"], {})
-                full_stations.append({
-                    **st,
-                    "isOpen": p.get("status") == "open",
-                    "diesel": _num_or_none(p.get("diesel")),
-                    "e5": _num_or_none(p.get("e5")),
-                    "e10": _num_or_none(p.get("e10")),
-                })
-
-            out_groups.append({
-                "name": group.get("name"),
-                "lat": group.get("lat"),
-                "lng": group.get("lng"),
-                "radius_km": group.get("radius_km"),
-                "desc": group.get("desc"),
-                "stations": full_stations,
-            })
-            log.info("Gruppe %s: %d Preise aktualisiert", group.get("name"), len(full_stations))
-
-        payload = {
-            "updated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "attribution": ATTRIBUTION,
-            "groups": out_groups,
-        }
-        with open(OUT_FILE, "w") as fh:
-            json.dump(payload, fh, separators=(",", ":"), ensure_ascii=False)
-
         with ClimacSFTP() as s:
+            old_prices = _load_old_prices(s)
+
+            out_groups = []
+            for group in cache.get("groups", []):
+                stations = group.get("stations", [])
+                ids = [st["id"] for st in stations if st.get("id")]
+
+                prices_by_id: dict = {}
+                for chunk in _chunks(ids, CHUNK_SIZE):
+                    prices_by_id.update(_prices_php(api_key, chunk))
+
+                full_stations = []
+                for st in stations:
+                    p = prices_by_id.get(st["id"])
+                    if p is None:
+                        fallback = old_prices.get(st["id"], {})
+                        log.warning(
+                            "Station %s (%s) fehlt komplett in prices.php-Antwort — "
+                            "Fallback auf letzten bekannten Preis",
+                            st["id"], st.get("name"),
+                        )
+                        full_stations.append({
+                            **st,
+                            "isOpen": fallback.get("isOpen", False),
+                            "diesel": fallback.get("diesel"),
+                            "e5": fallback.get("e5"),
+                            "e10": fallback.get("e10"),
+                        })
+                    else:
+                        full_stations.append({
+                            **st,
+                            "isOpen": p.get("status") == "open",
+                            "diesel": _num_or_none(p.get("diesel")),
+                            "e5": _num_or_none(p.get("e5")),
+                            "e10": _num_or_none(p.get("e10")),
+                        })
+
+                out_groups.append({
+                    "name": group.get("name"),
+                    "lat": group.get("lat"),
+                    "lng": group.get("lng"),
+                    "radius_km": group.get("radius_km"),
+                    "desc": group.get("desc"),
+                    "stations": full_stations,
+                })
+                log.info("Gruppe %s: %d Preise aktualisiert", group.get("name"), len(full_stations))
+
+            payload = {
+                "updated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+                "attribution": ATTRIBUTION,
+                "groups": out_groups,
+            }
+            with open(OUT_FILE, "w") as fh:
+                json.dump(payload, fh, separators=(",", ":"), ensure_ascii=False)
+
             remote = s.upload_file(OUT_FILE, REMOTE_NAME)
             log.info("Upload OK -> %s", remote)
 
