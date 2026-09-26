@@ -141,6 +141,22 @@
     .tanken-badge { font-size: 0.66rem; padding: 2px 8px; border-radius: 50px; margin-left: 6px; white-space: nowrap; }
     .tanken-badge.open { background: rgba(74,222,128,0.18); color: #4ade80; }
     .tanken-badge.closed { background: rgba(239,68,68,0.18); color: #ef4444; }
+    /* --- Tanken-Zahnrad-Panel: eigenes Overlay (WETTER-0012), NICHT .settings-menu --- */
+    #tanken-settings-backdrop { display: none; }
+    .tanken-settings-menu { display: none; position: absolute; top: calc(100% + 8px); right: 0; min-width: 190px; max-width: 340px; max-height: 70vh; overflow-y: auto; background: rgba(10,28,55,0.96); backdrop-filter: blur(18px); border: 1px solid rgba(255,255,255,0.16); border-radius: 14px; padding: 6px 0; z-index: 200; box-shadow: 0 8px 32px rgba(0,0,0,0.45); }
+    .tanken-settings-menu.open { display: block; }
+    .tanken-settings-done { display: none; }
+    @media (max-width: 1199px) {
+      #tanken-settings-backdrop.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 199; }
+      .tanken-settings-menu { position: fixed; max-width: none; z-index: 200; }
+      .tanken-settings-done { display: block; }
+    }
+    @media (max-width: 767px) {
+      .tanken-settings-menu { top: auto; right: 0; left: 0; bottom: 0; border-radius: 18px 18px 0 0; width: 100%; max-height: 75vh; }
+    }
+    @media (min-width: 768px) and (max-width: 1199px) {
+      .tanken-settings-menu { top: 50%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); width: calc(100% - 40px); max-width: 480px; border-radius: 18px; max-height: 80vh; }
+    }
   </style>
 </head>
 <body>
@@ -249,7 +265,8 @@
     <div style="display:flex;align-items:center;gap:10px;">
       <div class="settings-wrap">
         <button class="settings-btn" id="tanken-settings-btn" onclick="window.tankenToggleSettings(event)" title="Chart-Einstellungen" aria-label="Chart-Einstellungen öffnen">⚙</button>
-        <div class="settings-menu" id="tanken-settings-menu">
+        <div id="tanken-settings-backdrop" onclick="window.tankenCloseSettings()"></div>
+        <div class="tanken-settings-menu" id="tanken-settings-menu">
           <div class="sm-item" style="font-weight:700;opacity:0.7;cursor:default;">Stationen</div>
           <div id="tanken-station-checks"></div>
           <div class="sm-sep"></div>
@@ -257,6 +274,7 @@
           <label class="sm-item" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="tanken-fuel-e5" onchange="window.tankenPrefsChanged()"> E5</label>
           <label class="sm-item" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="tanken-fuel-e10" onchange="window.tankenPrefsChanged()"> E10</label>
           <label class="sm-item" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="tanken-fuel-diesel" onchange="window.tankenPrefsChanged()"> Diesel</label>
+          <button class="modal-close tanken-settings-done" onclick="window.tankenCloseSettings()">Fertig</button>
         </div>
       </div>
       <button class="nav-btn" id="btn-tanken-back" onclick="window.hideTanken()" title="Zurück zur Übersicht" aria-label="Zurück zur Wetterübersicht">Zurück</button>

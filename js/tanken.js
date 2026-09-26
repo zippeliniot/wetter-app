@@ -166,8 +166,21 @@ function renderSettingsPanel() {
 export function toggleSettings(e) {
   e?.stopPropagation();
   renderSettingsPanel();
-  document.getElementById('tanken-settings-menu')?.classList.toggle('open');
+  const opening = !document.getElementById('tanken-settings-menu')?.classList.contains('open');
+  document.getElementById('tanken-settings-menu')?.classList.toggle('open', opening);
+  document.getElementById('tanken-settings-backdrop')?.classList.toggle('open', opening);
 }
+
+/** Schliesst das Zahnrad-Panel + Backdrop (Bottom-Sheet/Modal-Breakpoints). */
+export function closeSettings() {
+  document.getElementById('tanken-settings-menu')?.classList.remove('open');
+  document.getElementById('tanken-settings-backdrop')?.classList.remove('open');
+}
+
+// Backdrop-Klick + "Fertig"-Button in index.html rufen dies direkt auf (Scope
+// WETTER-0012 ist auf index.html + js/tanken.js begrenzt, daher hier statt in
+// main.js registriert, analog zu window.closeImpressum in main.js).
+window.tankenCloseSettings = closeSettings;
 
 export function prefsChanged() {
   const stationChecks = [...document.querySelectorAll('#tanken-station-checks input[type="checkbox"]')];
