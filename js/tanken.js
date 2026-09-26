@@ -8,9 +8,11 @@ const STATION_COLORS = ['#4DD9FF', '#FFB830', '#4ade80', '#c084fc', '#fb7185', '
 const FUEL_DASH = { e5: [], e10: [6, 4], diesel: [2, 2] };
 const FUEL_LABEL = { e5: 'E5', e10: 'E10', diesel: 'Diesel' };
 
+const SORT_ORDER = ['e5', 'e10', 'diesel'];
+
 let active = false;
 let stations = [];
-let sortKey = 'e5';
+let sortKey = 'e10'; // Default passend zu DEFAULT_FUELS (E5 ist per Default nicht angezeigt)
 let historyData = null;
 let chartRange = 1; // Tage – eigener Kontext, nicht window.setRange/currentRange aus main.js
 
@@ -54,11 +56,51 @@ function fmtUpdated(iso) {
   return d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
+/** Sorgt dafuer, dass sortKey immer eine aktuell ausgewaehlte Sorte ist -
+ * sonst automatischer Wechsel auf die erste noch ausgewaehlte (E5->E10->Diesel). */
+function ensureValidSortKey() {
+  if (sortKey && prefs.fuels.includes(sortKey)) return;
+  sortKey = SORT_ORDER.find(f => prefs.fuels.includes(f)) || null;
+}
+
+function renderSortToggle() {
+  const toggle = document.getElementById('tanken-sort-toggle');
+  if (!toggle) return;
+  if (prefs.fuels.length === 0) {
+    toggle.style.display = 'none';
+    return;
+  }
+  toggle.style.display = '';
+  toggle.querySelectorAll('.range-btn').forEach(b => {
+    const fuel = b.dataset.sort;
+    const visible = prefs.fuels.includes(fuel);
+    b.style.display = visible ? '' : 'none';
+    b.classList.toggle('active', fuel === sortKey);
+  });
+}
+
 function render() {
   const list = document.getElementById('tanken-list');
   if (!list) return;
 
-  const sorted = [...stations].sort((a, b) => {
+  ensureValidSortKey();
+  renderSortToggle();
+
+  const filtered = stations.filter(st => isStationChecked(st.id));
+
+  if (stations.length > 0 && filtered.length === 0) {
+    list.innerHTML = '<p class="bz-empty">Keine Stationen ausgewählt (siehe ⚙)</p>';
+    return;
+  }
+
+  if (prefs.fuels.length === 0) {
+    list.innerHTML = filtered.length === 0
+      ? '<p class="bz-empty">Keine Stationen gefunden.</p>'
+      : '<p class="bz-empty">Keine Kraftstoffsorte ausgewählt (siehe ⚙)</p>';
+    return;
+  }
+
+  const sorted = [...filtered].sort((a, b) => {
     const av = a[sortKey];
     const bv = b[sortKey];
     const aNum = typeof av === 'number';
@@ -69,7 +111,11 @@ function render() {
     return av - bv;
   });
 
-  list.innerHTML = sorted.map(st => `
+  list.innerHTML = sorted.map(st => {
+    const priceRows = prefs.fuels.map(fuel => `
+      <div><div class="tanken-price-lbl">${FUEL_LABEL[fuel] ?? fuel}</div><div class="tanken-price">${fmtPrice(st[fuel])}</div></div>
+    `).join('');
+    return `
     <div class="card tanken-row ${st.isOpen ? '' : 'closed'}">
       <div>
         <div class="tanken-name">${st.name ?? '—'}${st.brand ? ` · ${st.brand}` : ''}
@@ -78,13 +124,10 @@ function render() {
         <div class="tanken-addr">${[st.street, st.houseNumber].filter(Boolean).join(' ')}, ${[st.postCode, st.place].filter(Boolean).join(' ')}</div>
         <div class="tanken-dist">${fmtDist(st.dist)}</div>
       </div>
-      <div class="tanken-prices">
-        <div><div class="tanken-price-lbl">E5</div><div class="tanken-price">${fmtPrice(st.e5)}</div></div>
-        <div><div class="tanken-price-lbl">E10</div><div class="tanken-price">${fmtPrice(st.e10)}</div></div>
-        <div><div class="tanken-price-lbl">Diesel</div><div class="tanken-price">${fmtPrice(st.diesel)}</div></div>
-      </div>
+      <div class="tanken-prices">${priceRows}</div>
     </div>
-  `).join('') || '<p class="bz-empty">Keine Stationen gefunden.</p>';
+  `;
+  }).join('') || '<p class="bz-empty">Keine Stationen gefunden.</p>';
 }
 
 // ---------- Zahnrad-Einstellungen (Stationen/Sorten je Geraet, localStorage) ----------
@@ -129,6 +172,7 @@ export function prefsChanged() {
   prefs.fuels = fuels;
 
   savePrefs();
+  render();
 }
 
 // ---------- Preisliste laden ----------
