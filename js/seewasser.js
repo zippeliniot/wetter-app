@@ -23,6 +23,11 @@ let history = null, live = null, hoursData = null;
 const monthCache = new Map();
 let activeTab = 'aktuell', cmpSensor = 'sw40', monthCursor = null, yearCursor = null;
 let chart = null, lastCfg = null, liveTimer = null;
+// Vergleich-Tab: Set der ausgeblendeten Jahre (null = noch nicht initialisiert,
+// Standard wird beim ersten Rendern auf "aeltere als die letzten 3" gesetzt).
+// Kein localStorage - bleibt nur waehrend der Sitzung erhalten.
+let cmpHiddenYears = null;
+const CMP_PALETTE = ['#00C8DC', '#FFB830', '#c084fc', '#fb7185', '#4ade80', '#38bdf8', '#facc15', '#f472b6', '#a3e635', '#fb923c', '#818cf8', '#2dd4bf'];
 
 // ---------- fetch ----------
 async function getJSON(url) {
@@ -455,20 +460,57 @@ async function cfgJahr(year) {
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), true) };
 }
 
+// Vergleich-Tab: Vereinigung aller Jahre aus beiden Wassersensoren + Luft-Monatsdaten,
+// aufsteigend sortiert. Haengt NICHT vom gewaehlten Sensor ab, damit die Jahr->Farbe
+// -Zuordnung stabil bleibt, egal ob 40 cm oder Grund gewaehlt ist.
+function cmpYears() {
+  const y1 = (history && history.years && history.years.sw40) ? Object.keys(history.years.sw40) : [];
+  const y2 = (history && history.years && history.years.swgr) ? Object.keys(history.years.swgr) : [];
+  const y3 = (history && history.at_monthly) ? Object.keys(history.at_monthly) : [];
+  return Array.from(new Set([...y1, ...y2, ...y3])).sort();
+}
+// Feste Farbe pro Jahr, haengt nur von der sortierten Gesamt-Jahresliste ab.
+// Mehr Jahre als Palettenfarben -> gleichmaessig verteilte HSL-Farben fuer alle Jahre.
+function cmpYearColor(allYears, yr) {
+  const n = allYears.length;
+  const i = allYears.indexOf(yr);
+  if (n <= CMP_PALETTE.length) {
+    const hex = CMP_PALETTE[i];
+    return { solid: hex, soft: hexA(hex, 0.28) };
+  }
+  const h = Math.round((360 * i) / n);
+  return { solid: `hsl(${h}, 65%, 60%)`, soft: `hsla(${h}, 65%, 60%, 0.28)` };
+}
+// Lazy: beim ersten Rendern des Vergleich-Tabs die letzten 3 Jahre sichtbar, Rest ausgeblendet.
+function ensureCmpDefaultVisibility(allYears) {
+  if (cmpHiddenYears !== null) return;
+  cmpHiddenYears = new Set();
+  const hideCount = Math.max(0, allYears.length - 3);
+  for (let i = 0; i < hideCount; i++) cmpHiddenYears.add(allYears[i]);
+}
+
 async function cfgVergleich() {
   await loadHistory();
-  const years = history.years[cmpSensor] || {};
-  const keys = Object.keys(years).sort();
+  const allYears = cmpYears();
+  ensureCmpDefaultVisibility(allYears);
   const labels = Array.from({ length: 365 }, (_, i) => i + 1);
-  const rgb = cmpSensor === 'sw40' ? [0, 200, 220] : [102, 221, 136];
-  const ds = keys.map((k, i) => {
-    const t = keys.length > 1 ? i / (keys.length - 1) : 1;
-    return line(k, years[k], `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${(0.30 + 0.65 * t).toFixed(2)})`,
-      { borderWidth: i === keys.length - 1 ? 2.5 : 1.4 });
-  });
-  const cy = String(new Date().getFullYear());
-  const mmv = (history.at_monthly && history.at_monthly[cy]) || null;
-  if (mmv) ds.push(...atBand(monthlyToDoy(mmv.min), monthlyToDoy(mmv.max), monthlyToDoy(mmv.avg), { tension: 0 }));
+  const waterYears = history.years[cmpSensor] || {};
+  const curYear = String(new Date().getFullYear());
+  const ds = [];
+  for (const yr of allYears) {
+    if (cmpHiddenYears.has(yr)) continue;
+    const color = cmpYearColor(allYears, yr);
+    if (waterYears[yr]) {
+      ds.push(line(yr, waterYears[yr], color.solid, { borderWidth: yr === curYear ? 2.5 : 1.6 }));
+    }
+    const mm = history.at_monthly && history.at_monthly[yr];
+    if (mm) {
+      ds.push(line(`Luft max. ${yr}`, monthlyToDoy(mm.max), color.solid,
+        { borderWidth: 1.2, borderDash: [6, 3], tension: 0, pointRadius: 0, spanGaps: false, fill: false }));
+      ds.push(line(`Luft min. ${yr}`, monthlyToDoy(mm.min), color.solid,
+        { borderWidth: 1.2, borderDash: [2, 3], tension: 0, pointRadius: 0, spanGaps: false, fill: false }));
+    }
+  }
   ds.push(line('Referenz', history.ref || [], C_REF, { borderWidth: 1.5, borderDash: [5, 4] }));
   return { type: 'line', data: { labels, datasets: ds }, options: baseOptions(doyX(), true) };
 }
@@ -502,13 +544,15 @@ function ensureInfoText() {
     + '3Tage: Stundenwerte letzte 72h. '
     + 'Woche: Tagesmittel letzte 7 Tage. '
     + 'Monat/Jahr/Vergleich: Historische Tagesmittel seit 2023. '
-    + 'Luft: Band = Minimum–Maximum je Intervall (Stunde/Tag/Monat), Linie = Durchschnitt.';
+    + 'Luft: Band = Minimum–Maximum je Intervall (Stunde/Tag/Monat), Linie = Durchschnitt. '
+    + 'Vergleich: je Jahr eine Farbe - Linie = Wasser, gestrichelt = Luft max., gepunktet = Luft min. (Monatswerte); Jahre per Button ein-/ausblendbar.';
   wrap.parentNode.insertBefore(p, wrap.nextSibling);
 }
 
 function renderSubctrl() {
   const el = document.getElementById('sw-subctrl');
   if (!el) return;
+  el.style.flexWrap = '';
   if (activeTab === 'monat') {
     const [y, m] = monthCursor.split('-').map(Number);
     const prevOff = monthCursor <= FIRST_MONTH ? 'disabled' : '';
@@ -527,8 +571,18 @@ function renderSubctrl() {
       + `<span>${yr}</span>`
       + `<button ${nextOff} onclick="window.swYearDelta(1)">›</button>`;
   } else if (activeTab === 'vergleich') {
+    el.style.flexWrap = 'wrap';
+    const allYears = cmpYears();
+    ensureCmpDefaultVisibility(allYears);
     const b = (k, l) => `<button onclick="window.swCmp('${k}')" style="${k === cmpSensor ? 'background:rgba(255,255,255,0.22);' : ''}">${l}</button>`;
-    el.innerHTML = b('sw40', '40 cm') + b('swgr', 'Grund');
+    const yearBtns = allYears.map((yr) => {
+      const hidden = cmpHiddenYears.has(yr);
+      const c = cmpYearColor(allYears, yr);
+      const style = hidden ? 'opacity:0.4;' : `background:${c.soft};border-color:${c.solid};color:#fff;`;
+      return `<button onclick="window.swCmpYear('${yr}')" style="${style}">${yr}</button>`;
+    }).join('');
+    el.innerHTML = b('sw40', '40 cm') + b('swgr', 'Grund')
+      + `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:100%;">${yearBtns}</div>`;
   } else {
     // aktuell: Luft+Feuchte steht bereits in #sw-current (updateHeader)
     el.innerHTML = '';
@@ -618,6 +672,19 @@ window.swYearDelta = (delta) => {
   render();
 };
 window.swCmp = (k) => { if (k !== cmpSensor) { cmpSensor = k; render(); } };
+window.swCmpYear = (yr) => {
+  yr = String(yr);
+  const allYears = cmpYears();
+  ensureCmpDefaultVisibility(allYears);
+  if (cmpHiddenYears.has(yr)) {
+    cmpHiddenYears.delete(yr);
+  } else {
+    const visibleCount = allYears.filter((y) => !cmpHiddenYears.has(y)).length;
+    if (visibleCount <= 1) return; // letztes sichtbares Jahr nicht ausblendbar
+    cmpHiddenYears.add(yr);
+  }
+  render();
+};
 
 // ---------- Fullscreen (nutzt bestehendes #fs-modal via main.js) ----------
 
