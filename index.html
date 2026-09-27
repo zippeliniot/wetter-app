@@ -161,6 +161,18 @@
     @media (min-width: 768px) and (max-width: 1199px) {
       .tanken-settings-menu { top: 50%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); width: calc(100% - 40px); max-width: 480px; border-radius: 18px; max-height: 80vh; }
     }
+    /* WETTER-0014: Mehrspalten-Grid Tablet-Quer / Desktop */
+    @media (min-width: 1000px) {
+      .page { max-width: 1240px; }
+      #main-view { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+      #main-view > .card { margin-bottom: 0; }
+      #no-weather-notice, #fc-card, #main-view > .controls, #main-view > .updated { grid-column: 1 / -1; }
+      #regen-header, #regen-view, #tanken-header, #tanken-view { max-width: 760px; margin-left: auto; margin-right: auto; }
+    }
+    @media (min-width: 1600px) {
+      .page { max-width: 1860px; }
+      #main-view { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
   </style>
 </head>
 <body>
@@ -399,7 +411,7 @@
     <div id="blitz-body" class="bz-body"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="fc-card">
     <div class="card-title">7-Tage-Vorschau</div>
     <table class="fc-table" id="fc-table"></table>
   </div>
