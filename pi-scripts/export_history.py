@@ -11,6 +11,8 @@ zusammengefuehrt (SENSOR_MEASUREMENTS in climac_sftp.py):
           -> ab erstem verfuegbaren Datum (weiter Startpunkt, leere Jahre entfallen)
   AT    : gw2000a_outdoor_temperature (Aussentemperatur)
           -> ab erstem verfuegbaren Datum
+  WIND  : gw2000a_wind_speed (Windgeschwindigkeit, gemessen)
+          -> ab 2025-01-22 (Sensor-Start laut InfluxDB)
 
 Gruppierung: Jahr -> DOY (1..365), Tagesmittel.
 DOY-Referenzkurve + Sommer-Schwelle kommen aus SQLite.
@@ -40,10 +42,12 @@ REMOTE_NAME = "history.json"
 SW40_START = "2023-06-01T00:00:00Z"
 SWGR_START = "2015-01-01T00:00:00Z"
 AT_START = "2015-01-01T00:00:00Z"
+WIND_START = "2025-01-22T00:00:00Z"
 
 SW40_MEASUREMENTS = SENSOR_MEASUREMENTS["sw40"]
 SWGR_MEASUREMENTS = SENSOR_MEASUREMENTS["swgr"]
 AT_MEASUREMENTS = SENSOR_MEASUREMENTS["at"]
+WIND_MEASUREMENTS = SENSOR_MEASUREMENTS["wind_speed"]
 
 ML_ROLE = "sea_water"
 DEFAULT_SUMMER_THRESHOLD = 18.0
@@ -172,13 +176,16 @@ def main() -> int:
             swgr = query_years(client, SWGR_MEASUREMENTS, SWGR_START)
             at = query_years(client, AT_MEASUREMENTS, AT_START)
             at_monthly = query_months(client, AT_MEASUREMENTS, AT_START)
+            wind = query_years(client, WIND_MEASUREMENTS, WIND_START)
+            wind_monthly = query_months(client, WIND_MEASUREMENTS, WIND_START)
 
         payload = {
             "updated": datetime.now().strftime("%Y-%m-%d"),
             "summer_threshold": summer_threshold,
             "ref": ref,
-            "years": {"sw40": sw40, "swgr": swgr, "at": at},
+            "years": {"sw40": sw40, "swgr": swgr, "at": at, "wind": wind},
             "at_monthly": at_monthly,
+            "wind_monthly": wind_monthly,
         }
         with open(OUT_FILE, "w") as fh:
             json.dump(payload, fh, separators=(",", ":"), allow_nan=False)
@@ -192,9 +199,13 @@ def main() -> int:
         log.info("sw40 %s", _summary(sw40))
         log.info("swgr %s", _summary(swgr))
         log.info("at   %s", _summary(at))
+        log.info("wind %s", _summary(wind))
         log.info("at_monthly %s", ", ".join(
             f"{y}:{sum(1 for v in md['min'] if v is not None)}mo"
             for y, md in at_monthly.items()) or "-")
+        log.info("wind_monthly %s", ", ".join(
+            f"{y}:{sum(1 for v in md['min'] if v is not None)}mo"
+            for y, md in wind_monthly.items()) or "-")
         log.info("geschrieben: %s (%d Bytes)", OUT_FILE, os.path.getsize(OUT_FILE))
 
         with ClimacSFTP() as s:

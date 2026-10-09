@@ -42,6 +42,8 @@ INFLUX_BUCKET = "homeassistant"
 #   swgr : Seewasser Grund (Boden)
 #   at   : Aussentemperatur, ah : Aussenluftfeuchte
 #   bld  : Blitz-Entfernung, blt : letzter Blitz, bln : Blitzanzahl
+#   wind_speed : Windgeschwindigkeit, wind_gust : Windboe, wind_dir : Windrichtung,
+#   wind_gust_max : Tageshoechstwert Boe (stationsseitig, resettet taeglich)
 SENSOR_MEASUREMENTS = {
     "sw40": [
         "sensor.temperature_sensor_101_40_cm_temperature",  # alt, ab 2023-06
@@ -57,6 +59,10 @@ SENSOR_MEASUREMENTS = {
     "bld": ["sensor.gw2000a_lightning_strike_distance_3"],
     "blt": ["sensor.gw2000a_last_lightning_strike_3"],
     "bln": ["sensor.gw2000a_lightning_strikes_3"],
+    "wind_speed": ["sensor.gw2000a_wind_speed"],
+    "wind_gust": ["sensor.gw2000a_wind_gust"],
+    "wind_dir": ["sensor.gw2000a_wind_direction"],
+    "wind_gust_max": ["sensor.gw2000a_max_daily_gust_3"],
 }
 
 

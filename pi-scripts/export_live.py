@@ -10,6 +10,10 @@ Laeuft alle 15 Minuten.
   bld  : sensor.gw2000a_lightning_strike_distance_3
   blt  : sensor.gw2000a_last_lightning_strike_3
   bln  : sensor.gw2000a_lightning_strikes_3
+  wind_speed : sensor.gw2000a_wind_speed
+  wind_gust  : sensor.gw2000a_wind_gust
+  wind_dir   : sensor.gw2000a_wind_direction
+  wind_gust_max : sensor.gw2000a_max_daily_gust_3
 
 sw40/swgr: Zeitfenster -3h; wenn leer Fallback -7d + last() (Sensor kann laenger
 offline sein). Zusaetzlich "sw40_age"/"swgr_age" in Minuten (Alter des letzten
@@ -17,7 +21,8 @@ Werts, null wenn nichts gefunden).
 
 Ausgabe /tmp/climac_live.json  ->  Upload data/live.json
   {"t":"2026-08-30T12:00Z","sw40":20.5,"sw40_age":12,"swgr":20.9,"swgr_age":12,
-   "at":19.8,"ah":83,"bld":null,"blt":null,"bln":null}
+   "at":19.8,"ah":83,"bld":null,"blt":null,"bln":null,
+   "wind_speed":3.2,"wind_gust":5.1,"wind_dir":210,"wind_gust_max":7.4}
 
 Zusaetzlich stuendliche Zeitreihe (letzte 72 h). sw40/swgr/ah je Stunde Mittel,
 Lufttemperatur zusaetzlich Min/Max je Stunde (at=avg, at_min, at_max):
@@ -69,6 +74,10 @@ SENSORS = {
     "bld": {"m": ["sensor.gw2000a_lightning_strike_distance_3"], "nd": 0, "range": "-30m"},
     "blt": {"m": ["sensor.gw2000a_last_lightning_strike_3"], "nd": 0, "range": "-30m"},
     "bln": {"m": ["sensor.gw2000a_lightning_strikes_3"], "nd": 0, "range": "-30m"},
+    "wind_speed": {"m": ["sensor.gw2000a_wind_speed"], "nd": 1, "range": "-30m"},
+    "wind_gust": {"m": ["sensor.gw2000a_wind_gust"], "nd": 1, "range": "-30m"},
+    "wind_dir": {"m": ["sensor.gw2000a_wind_direction"], "nd": 0, "range": "-30m"},
+    "wind_gust_max": {"m": ["sensor.gw2000a_max_daily_gust_3"], "nd": 1, "range": "-30m"},
 }
 
 log = logging.getLogger("export_live")

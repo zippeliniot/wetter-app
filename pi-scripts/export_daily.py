@@ -11,6 +11,7 @@ Modi:
 Logiksensoren (union ueber Measurement-Varianten, SENSOR_MEASUREMENTS):
   sw40 : Seewasser 40 cm      swgr : Seewasser Grund
   at   : Aussentemperatur     ah   : Aussenluftfeuchte
+  wind_speed : Windgeschwindigkeit (gemessen, GW2000A)
 
 Zeitbasis Europe/Berlin. Vorhandene Tageswerte in der Monatsdatei bleiben
 erhalten und werden nur ueberschrieben, wo InfluxDB einen neuen Wert liefert.
@@ -34,7 +35,7 @@ LOG_FILE = os.path.join(SCRIPT_DIR, "logs", "export_daily.log")
 BACKFILL_START = (2023, 6)
 
 # Reihenfolge = Spaltenreihenfolge in der Monatsdatei
-SENSORS = {key: SENSOR_MEASUREMENTS[key] for key in ("sw40", "swgr", "at", "ah")}
+SENSORS = {key: SENSOR_MEASUREMENTS[key] for key in ("sw40", "swgr", "at", "ah", "wind_speed")}
 
 COLS = ["d"]
 for _key in SENSORS:
