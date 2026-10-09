@@ -37,6 +37,72 @@ function getWindCityIdx() {
     return idx >= 0 ? idx : 1;
 }
 
+// --- Wind-Statzeile / Animationen (Kopf + Legende der Wind-Karte) ---
+let windArrowAngle = null;   // kumulierter Winkel (nicht normalisiert) für kuerzeste Drehrichtung
+let windActiveZoneKey = null; // zuletzt hervorgehobene Schwellenzone
+
+/** Zaehlt einen Zahlenwert sanft von alt auf neu hoch, ohne Animation bei unveraendertem Wert. */
+function animateWindValue(el, newVal, suffix = '') {
+    if (!el || newVal == null) return;
+    const prev = el.dataset.rawVal != null ? parseFloat(el.dataset.rawVal) : null;
+    el.dataset.rawVal = newVal;
+    if (prev === null || Math.round(prev) === Math.round(newVal)) {
+        el.textContent = Math.round(newVal) + suffix;
+        return;
+    }
+    const start = performance.now(), duration = 500, from = prev, to = newVal;
+    (function step(now) {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        el.textContent = Math.round(from + (to - from) * eased) + suffix;
+        if (t < 1) requestAnimationFrame(step);
+    })(start);
+}
+
+/** Dreht das Richtungs-Pfeil-Icon ueber den kuerzesten Weg (nicht den vollen Kreis). */
+function rotateWindArrow(el, dir) {
+    if (!el || dir == null) return;
+    const target = (dir + 180) % 360;
+    if (windArrowAngle === null) {
+        windArrowAngle = target;
+        el.style.transition = 'none';
+        el.style.transform = `rotate(${target}deg)`;
+        requestAnimationFrame(() => { el.style.transition = ''; });
+        return;
+    }
+    const prevMod = ((windArrowAngle % 360) + 360) % 360;
+    const delta = ((target - prevMod + 540) % 360) - 180;
+    windArrowAngle += delta;
+    el.style.transform = `rotate(${windArrowAngle}deg)`;
+}
+
+/** Hebt die aktuell zutreffende Windstaerke-Zone in der Legende dezent hervor (Puls nur bei Zonenwechsel). */
+function highlightWindZone(speed) {
+    if (speed == null) return;
+    const key = speed <= 15 ? 'schwach' : speed <= 25 ? 'maessig' : speed < 50 ? 'stark' : 'sturm';
+    document.querySelectorAll('#wind-card .wt-item').forEach(item => {
+        item.classList.toggle('wt-current', item.id === `wt-${key}`);
+    });
+    if (key !== windActiveZoneKey) {
+        windActiveZoneKey = key;
+        const el = document.getElementById(`wt-${key}`);
+        if (el) { el.classList.remove('wt-pulse'); void el.offsetWidth; el.classList.add('wt-pulse'); }
+    }
+}
+
+/** Aktualisiert die Wind-Statzeile (Aktuell/Max/Ø) aus den bereits geladenen Chart-Werten (kein neuer API-Call). */
+function updateWindStatLine(winds) {
+    const valid = (winds || []).filter(v => v != null);
+    if (!valid.length) return;
+    const cur = valid[0];
+    const max = Math.max(...valid);
+    const avg = Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
+    animateWindValue(document.getElementById('ws-cur'), cur, ' km/h');
+    animateWindValue(document.getElementById('ws-max'), max, ' km/h');
+    animateWindValue(document.getElementById('ws-avg'), avg, ' km/h');
+    highlightWindZone(cur);
+}
+
 // --- APP LOGIC ---
 
 /**
@@ -152,7 +218,10 @@ function initCharts() {
         const tempCfg = charts.getTempChartConfig(cachedData, currentRange, CITIES);
         if (tempCfg) tempChart = new Chart(document.getElementById('temp-chart'), tempCfg);
         const windCfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', getWindCityIdx());
-        if (windCfg) windChart = new Chart(document.getElementById('wind-chart'), windCfg);
+        if (windCfg) {
+            windChart = new Chart(document.getElementById('wind-chart'), windCfg);
+            updateWindStatLine(windCfg.data.datasets[0].data);
+        }
         if (marineCache) {
             seaChart = new Chart(document.getElementById('sea-chart'), charts.getSeaChartConfig(marineCache, currentRange, CITIES));
         }
@@ -179,6 +248,7 @@ function updateCharts() {
             windChart.data = cfg.data;
             windChart._isNight = cfg._isNight;
             windChart.update('none');
+            updateWindStatLine(cfg.data.datasets[0].data);
         }
     }
     if (seaChart && marineCache) {
@@ -226,13 +296,22 @@ function updateTempHeader() {
 }
 
 function updateWindHeader() {
-    const el = document.getElementById('wind-current');
-    if (!el) return;
-    const cur = cachedData?.[1]?.current;
-    if (!cur || cur.wind_speed_10m == null) { el.textContent = ''; return; }
+    const valEl = document.getElementById('wind-current-value');
+    const dirEl = document.getElementById('wind-current-dir');
+    const arrowEl = document.getElementById('wind-arrow');
+    if (!valEl) return;
+    const idx = getWindCityIdx();
+    const cur = cachedData?.[idx]?.current;
+    if (!cur || cur.wind_speed_10m == null) { valEl.textContent = ''; if (dirEl) dirEl.textContent = ''; return; }
     const speed = Math.round(cur.wind_speed_10m);
-    const dir = cur.wind_direction_10m != null ? utils.getWindDir(cur.wind_direction_10m) : null;
-    el.textContent = [speed + ' km/h', dir].filter(Boolean).join(' ');
+    const dirDeg = cur.wind_direction_10m;
+    const dirTxt = dirDeg != null ? utils.getWindDir(dirDeg) : null;
+    animateWindValue(valEl, speed, ' km/h');
+    if (dirEl) dirEl.textContent = dirTxt ? ' ' + dirTxt : '';
+    rotateWindArrow(arrowEl, dirDeg);
+
+    const windCfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', idx);
+    if (windCfg) updateWindStatLine(windCfg.data.datasets[0].data);
 }
 
 function applyLocationFilter() {

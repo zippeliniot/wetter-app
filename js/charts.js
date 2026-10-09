@@ -297,7 +297,10 @@ export function getWindChartConfig(allData, range, cities, canvasId = 'wind-char
             ticks: { display: true, color: 'transparent', callback: () => '0.0mm' }
           }
         },
-        animation: { duration: 350 },
+        animation: {
+          duration: 350,
+          delay: (ctx) => ctx.type === 'data' ? ctx.dataIndex * 18 : 0,
+        },
         layout: { padding: { top: 24, left: 0, right: 0 } },
       },
       plugins: [dayNightPlugin, windZonesPlugin, windArrowPlugin],
