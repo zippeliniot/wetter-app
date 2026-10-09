@@ -12,6 +12,14 @@ Logiksensoren (union ueber Measurement-Varianten, SENSOR_MEASUREMENTS):
   sw40 : Seewasser 40 cm      swgr : Seewasser Grund
   at   : Aussentemperatur     ah   : Aussenluftfeuchte
   wind_speed : Windgeschwindigkeit (gemessen, GW2000A)
+  wind_gust_max : vom Sensor selbst gefuehrter Tageshoechstwert der Boe
+                  (gw2000a_max_daily_gust_3, innerhalb des Tages monoton
+                  steigend, resettet um Mitternacht). NUR die _max-Spalte
+                  ist sinnvoll (= der vom Sensor erreichte Tageshoechstwert);
+                  die automatisch mitgenerierten wind_gust_max_min/_mean sind
+                  semantisch bedeutungslos (Reset-naher Niedrigwert bzw.
+                  Mittelwert ueber Reset-Zyklen) und werden vom Frontend
+                  nicht gelesen.
 
 Zeitbasis Europe/Berlin. Vorhandene Tageswerte in der Monatsdatei bleiben
 erhalten und werden nur ueberschrieben, wo InfluxDB einen neuen Wert liefert.
@@ -35,7 +43,7 @@ LOG_FILE = os.path.join(SCRIPT_DIR, "logs", "export_daily.log")
 BACKFILL_START = (2023, 6)
 
 # Reihenfolge = Spaltenreihenfolge in der Monatsdatei
-SENSORS = {key: SENSOR_MEASUREMENTS[key] for key in ("sw40", "swgr", "at", "ah", "wind_speed")}
+SENSORS = {key: SENSOR_MEASUREMENTS[key] for key in ("sw40", "swgr", "at", "ah", "wind_speed", "wind_gust_max")}
 
 COLS = ["d"]
 for _key in SENSORS:

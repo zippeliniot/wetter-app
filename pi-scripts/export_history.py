@@ -13,6 +13,11 @@ zusammengefuehrt (SENSOR_MEASUREMENTS in climac_sftp.py):
           -> ab erstem verfuegbaren Datum
   WIND  : gw2000a_wind_speed (Windgeschwindigkeit, gemessen)
           -> ab 2025-01-22 (Sensor-Start laut InfluxDB)
+  WIND_GUST_MAX : gw2000a_max_daily_gust_3 (vom Sensor selbst gefuehrter
+          Tageshoechstwert der Boe) -> ab 2025-01-22, nur Monats-Aufloesung
+          (wind_gust_max_monthly, flaches {jahr: [12 floats|null]}, NUR die
+          Max-Reihe aus query_months() - Min/Mittel sind auf dieser Rohreihe
+          bedeutungslos, siehe export_daily.py). Keine DOY-Tagesreihe.
 
 Gruppierung: Jahr -> DOY (1..365), Tagesmittel.
 DOY-Referenzkurve + Sommer-Schwelle kommen aus SQLite.
@@ -48,6 +53,7 @@ SW40_MEASUREMENTS = SENSOR_MEASUREMENTS["sw40"]
 SWGR_MEASUREMENTS = SENSOR_MEASUREMENTS["swgr"]
 AT_MEASUREMENTS = SENSOR_MEASUREMENTS["at"]
 WIND_MEASUREMENTS = SENSOR_MEASUREMENTS["wind_speed"]
+WIND_GUST_MAX_MEASUREMENTS = SENSOR_MEASUREMENTS["wind_gust_max"]
 
 ML_ROLE = "sea_water"
 DEFAULT_SUMMER_THRESHOLD = 18.0
@@ -178,6 +184,12 @@ def main() -> int:
             at_monthly = query_months(client, AT_MEASUREMENTS, AT_START)
             wind = query_years(client, WIND_MEASUREMENTS, WIND_START)
             wind_monthly = query_months(client, WIND_MEASUREMENTS, WIND_START)
+            wind_gust_max_months_full = query_months(
+                client, WIND_GUST_MAX_MEASUREMENTS, WIND_START)
+
+        wind_gust_max_monthly = {
+            y: d["max"] for y, d in wind_gust_max_months_full.items()
+        }
 
         payload = {
             "updated": datetime.now().strftime("%Y-%m-%d"),
@@ -186,6 +198,7 @@ def main() -> int:
             "years": {"sw40": sw40, "swgr": swgr, "at": at, "wind": wind},
             "at_monthly": at_monthly,
             "wind_monthly": wind_monthly,
+            "wind_gust_max_monthly": wind_gust_max_monthly,
         }
         with open(OUT_FILE, "w") as fh:
             json.dump(payload, fh, separators=(",", ":"), allow_nan=False)
@@ -206,6 +219,9 @@ def main() -> int:
         log.info("wind_monthly %s", ", ".join(
             f"{y}:{sum(1 for v in md['min'] if v is not None)}mo"
             for y, md in wind_monthly.items()) or "-")
+        log.info("wind_gust_max_monthly %s", ", ".join(
+            f"{y}:{sum(1 for v in vals if v is not None)}mo"
+            for y, vals in wind_gust_max_monthly.items()) or "-")
         log.info("geschrieben: %s (%d Bytes)", OUT_FILE, os.path.getsize(OUT_FILE))
 
         with ClimacSFTP() as s:
