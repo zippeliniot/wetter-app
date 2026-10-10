@@ -5,6 +5,7 @@ import * as ui from './ui.js';
 import * as utils from './utils.js';
 import * as charts from './charts.js';
 import * as seewasser from './seewasser.js';
+import * as wind from './wind.js';
 import * as blitz from './blitz.js';
 import * as regen from './regen.js';
 import * as tanken from './tanken.js';
@@ -13,7 +14,7 @@ import * as tanken from './tanken.js';
 let currentRange = 1;
 let currentLocation = localStorage.getItem('wetter-loc') || 'gronenberg';
 let cachedData = null, marineCache = null;
-let tempChart = null, windChart = null, seaChart = null, fsChart = null;
+let tempChart = null, seaChart = null, fsChart = null;
 let shellBuilt = false;
 
 // Speicher-Keys für den LocalStorage
@@ -37,7 +38,7 @@ function getWindCityIdx() {
     return idx >= 0 ? idx : 1;
 }
 
-// --- Wind-Statzeile / Animationen (Kopf + Legende der Wind-Karte) ---
+// --- Wind-Animationen (Kopf + Legende der Wind-Karte) ---
 let windArrowAngle = null;   // kumulierter Winkel (nicht normalisiert) für kuerzeste Drehrichtung
 let windActiveZoneKey = null; // zuletzt hervorgehobene Schwellenzone
 
@@ -88,19 +89,6 @@ function highlightWindZone(speed) {
         const el = document.getElementById(`wt-${key}`);
         if (el) { el.classList.remove('wt-pulse'); void el.offsetWidth; el.classList.add('wt-pulse'); }
     }
-}
-
-/** Aktualisiert die Wind-Statzeile (Aktuell/Max/Ø) aus den bereits geladenen Chart-Werten (kein neuer API-Call). */
-function updateWindStatLine(winds) {
-    const valid = (winds || []).filter(v => v != null);
-    if (!valid.length) return;
-    const cur = valid[0];
-    const max = Math.max(...valid);
-    const avg = Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
-    animateWindValue(document.getElementById('ws-cur'), cur, ' km/h');
-    animateWindValue(document.getElementById('ws-max'), max, ' km/h');
-    animateWindValue(document.getElementById('ws-avg'), avg, ' km/h');
-    highlightWindZone(cur);
 }
 
 // --- APP LOGIC ---
@@ -217,11 +205,6 @@ function initCharts() {
     requestAnimationFrame(() => {
         const tempCfg = charts.getTempChartConfig(cachedData, currentRange, CITIES);
         if (tempCfg) tempChart = new Chart(document.getElementById('temp-chart'), tempCfg);
-        const windCfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', getWindCityIdx());
-        if (windCfg) {
-            windChart = new Chart(document.getElementById('wind-chart'), windCfg);
-            updateWindStatLine(windCfg.data.datasets[0].data);
-        }
         if (marineCache) {
             seaChart = new Chart(document.getElementById('sea-chart'), charts.getSeaChartConfig(marineCache, currentRange, CITIES));
         }
@@ -240,15 +223,6 @@ function updateCharts() {
             tempChart._N = cfg._N;
             // Wichtig: 'none' verhindert Animationen beim Hintergrund-Update
             tempChart.update('none');
-        }
-    }
-    if (windChart) {
-        const cfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', getWindCityIdx());
-        if (cfg) {
-            windChart.data = cfg.data;
-            windChart._isNight = cfg._isNight;
-            windChart.update('none');
-            updateWindStatLine(cfg.data.datasets[0].data);
         }
     }
     if (seaChart && marineCache) {
@@ -309,9 +283,7 @@ function updateWindHeader() {
     animateWindValue(valEl, speed, ' km/h');
     if (dirEl) dirEl.textContent = dirTxt ? ' ' + dirTxt : '';
     rotateWindArrow(arrowEl, dirDeg);
-
-    const windCfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', idx);
-    if (windCfg) updateWindStatLine(windCfg.data.datasets[0].data);
+    highlightWindZone(speed);
 }
 
 function applyLocationFilter() {
@@ -331,16 +303,10 @@ function applyLocationFilter() {
         tempChart.update('none');
     }
 
-    // --- Wind-Chart: Daten der gewählten Stadt / bei 'all' → GR ---
-    // Wind-Chart wird neu befüllt (Daten und Titel)
-    if (windChart && cachedData) {
+    // --- Wind-Chart: Daten der gewählten Stadt / bei 'all' → GR (Chart verwaltet wind.js) ---
+    if (cachedData) {
         const wIdx = getWindCityIdx();
-        const windCfg = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'wind-chart', wIdx);
-        if (windCfg) {
-            windChart.data = windCfg.data;
-            windChart._isNight = windCfg._isNight;
-            windChart.update('none');
-        }
+        wind.setForecast(cachedData, currentRange, wIdx, CITIES);
         // Titel der Wind-Card aktualisieren
         const windTitleEl = document.getElementById('wind-card-title');
         if (windTitleEl) windTitleEl.textContent = `Wind · ${CITIES[wIdx].name} km/h ↗`;
@@ -463,6 +429,7 @@ window.manualRefresh = () => {
     }
     loadAll(false);
     seewasser.refreshLive();
+    wind.refreshLive();
     blitz.refresh();
     regen.refreshNavStatus();
 };
@@ -563,5 +530,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // 3. Taschensee- + Blitz-Karte (unabhaengig von der Open-Meteo-Schleife)
     seewasser.initSeewasser();
+    wind.initWind();
     blitz.initBlitz();
 });

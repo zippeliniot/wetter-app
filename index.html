@@ -54,10 +54,6 @@
     @keyframes wtPulse { 0% { transform: scale(1); } 40% { transform: scale(1.2); } 100% { transform: scale(1); } }
     .wind-current { display: inline-flex; align-items: center; gap: 4px; }
     .wind-arrow { display: inline-block; font-size: 0.95em; transition: transform 0.6s ease; }
-    .wind-stats { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 2px 0 4px; padding: 6px 10px; background: rgba(255,255,255,0.05); border-radius: 10px; }
-    .ws-item { display: flex; align-items: baseline; gap: 5px; font-size: 0.82rem; }
-    .ws-k { opacity: 0.68; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.72rem; }
-    .ws-v { font-weight: 700; font-size: 0.92rem; }
     .range-toggle { display: flex; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); border-radius: 50px; padding: 3px; gap: 3px; }
     .range-btn { padding: 6px 22px; border-radius: 50px; border: none; background: transparent; color: rgba(255,255,255,0.65); font-size: 0.88rem; font-weight: 600; letter-spacing: 1px; cursor: pointer; transition: background 0.18s, color 0.18s; }
     .range-btn.active { background: rgba(255,255,255,0.22); color: #fff; }
@@ -98,13 +94,13 @@
     .modal-close { display: block; margin-top: 20px; width: 100%; padding: 10px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.10); color: #fff; font-size: 0.88rem; cursor: pointer; transition: background 0.18s; }
     .modal-close:hover { background: rgba(255,255,255,0.22); }
     /* --- Taschensee-Karte --- */
-    .sw-tabs { flex-wrap: wrap; gap: 3px; }
-    .sw-tabs .range-btn { padding: 6px 14px; font-size: 0.8rem; letter-spacing: 0.5px; }
+    .sw-tabs, .wind-tabs { flex-wrap: wrap; gap: 3px; }
+    .sw-tabs .range-btn, .wind-tabs .range-btn { padding: 6px 14px; font-size: 0.8rem; letter-spacing: 0.5px; }
     .sw-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 0; }
     #taschensee-card .chart-wrapper { margin-top: 4px; }
-    .sw-subctrl { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 3px 0 0; font-size: 1.05rem; opacity: 0.9; min-height: 4px; }
-    .sw-subctrl button { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.20); color: #fff; border-radius: 50px; padding: 4px 13px; cursor: pointer; font-size: 0.82rem; }
-    .sw-subctrl button:disabled { opacity: 0.3; cursor: default; }
+    .sw-subctrl, .wind-subctrl { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 3px 0 0; font-size: 1.05rem; opacity: 0.9; min-height: 4px; }
+    .sw-subctrl button, .wind-subctrl button { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.20); color: #fff; border-radius: 50px; padding: 4px 13px; cursor: pointer; font-size: 0.82rem; }
+    .sw-subctrl button:disabled, .wind-subctrl button:disabled { opacity: 0.3; cursor: default; }
     /* --- Blitz-Karte --- */
     .bz-body { display: flex; flex-direction: column; margin-top: 6px; }
     .bz-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.08); }
@@ -378,11 +374,14 @@
         </div>
       </div>
     </div>
-    <div class="wind-stats" id="wind-stats">
-      <div class="ws-item"><span class="ws-k">Aktuell</span><span class="ws-v" id="ws-cur">–</span></div>
-      <div class="ws-item"><span class="ws-k">Max</span><span class="ws-v" id="ws-max">–</span></div>
-      <div class="ws-item"><span class="ws-k">Ø</span><span class="ws-v" id="ws-avg">–</span></div>
+    <div class="range-toggle wind-tabs" role="group" style="margin-bottom:4px;">
+      <button class="range-btn active" data-tab="aktuell"   onclick="window.windSetTab('aktuell')">Aktuell</button>
+      <button class="range-btn"        data-tab="woche"     onclick="window.windSetTab('woche')">Woche</button>
+      <button class="range-btn"        data-tab="monat"     onclick="window.windSetTab('monat')">Monat</button>
+      <button class="range-btn"        data-tab="jahr"      onclick="window.windSetTab('jahr')">Jahr</button>
+      <button class="range-btn"        data-tab="vergleich" onclick="window.windSetTab('vergleich')">Vergleich</button>
     </div>
+    <div class="wind-subctrl" id="wind-subctrl"></div>
     <div class="chart-wrapper" style="height: 280px;"><canvas id="wind-chart"></canvas></div>
   </div>
 
