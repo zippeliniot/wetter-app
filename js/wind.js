@@ -21,7 +21,7 @@ const CMP_PALETTE = ['#00C8DC', '#FFB830', '#c084fc', '#fb7185', '#4ade80', '#38
 let history = null, live = null;
 const monthCache = new Map();
 let activeTab = 'aktuell', monthCursor = null, yearCursor = null;
-let chart = null, liveTimer = null, monthEmpty = false;
+let chart = null, lastCfg = null, liveTimer = null, monthEmpty = false;
 let cmpHiddenYears = null; // null = noch nicht initialisiert (Standard: aeltere als die letzten 3 ausgeblendet)
 // Forecast-Kontext aus main.js (Stadt-/Range-abhaengig)
 let fc = { data: null, range: 1, cityIdx: GR_IDX, cities: null };
@@ -315,6 +315,7 @@ async function render(soft = false) {
   if (!cfg) return;
   const canvas = document.getElementById('wind-chart');
   if (!canvas) return;
+  lastCfg = cfg;
   if (soft && chart && chart.config.type === cfg.type && activeTab === 'aktuell') {
     chart.data = cfg.data;
     chart._isNight = cfg._isNight;
@@ -323,6 +324,40 @@ async function render(soft = false) {
   }
   if (chart) chart.destroy();
   chart = new Chart(canvas, cfg);
+}
+
+// Vollbild-Config aus der zuletzt gebauten Karten-Config (aktiver Tab): Legende an, `_`-Datasets raus.
+// Datasets werden flach kopiert (nicht structuredClone): sie enthalten Funktionen (segment.borderColor).
+export function getFSConfig() {
+  if (!lastCfg) return null;
+  const data = {
+    ...lastCfg.data,
+    labels: [...lastCfg.data.labels],
+    datasets: lastCfg.data.datasets.map((ds) => ({ ...ds })),
+  };
+  return {
+    type: lastCfg.type,
+    data,
+    options: {
+      ...lastCfg.options,
+      plugins: {
+        ...lastCfg.options.plugins,
+        legend: {
+          display: true,
+          labels: {
+            color: 'rgba(255,255,255,0.85)',
+            font: { size: 13 },
+            usePointStyle: true,
+            pointStyle: 'line',
+            filter: (item) => item.text && !item.text.startsWith('_'),
+          },
+        },
+      },
+      scales: { ...lastCfg.options.scales },
+    },
+    plugins: lastCfg.plugins ?? [],
+    _isNight: lastCfg._isNight,
+  };
 }
 
 // ---------- Schnittstelle zu main.js ----------

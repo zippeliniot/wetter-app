@@ -388,9 +388,11 @@ window.openFS = (type) => {
       title.textContent = "Temperatur & Niederschlag";
       config = charts.getTempChartConfig(cachedData, currentRange, CITIES, 'fs-canvas');
     } else if (type === 'wind') {
+      const c = wind.getFSConfig();
+      if (!c) return;
       const wIdx = getWindCityIdx();
       title.textContent = `Windgeschwindigkeit ${CITIES[wIdx].name}`;
-      config = charts.getWindChartConfig(cachedData, currentRange, CITIES, 'fs-canvas', wIdx);
+      config = c;
     } else if (type === 'seewasser') {
       const c = seewasser.getFSConfig();
       if (!c) return;
