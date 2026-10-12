@@ -5,6 +5,7 @@
 
 import { showToast } from './ui.js';
 import * as charts from './charts.js';
+import { windFill, windBorder } from './charts.js';
 
 const DATA = 'data/';
 const C_WIND = '#38bdf8';
@@ -55,12 +56,20 @@ function hexA(hex, a) {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 const liveGust = () => (live && live.wind_gust_max != null ? live.wind_gust_max : null);
-// { tag: Tagesmax Boe } aus einer Monatsdatei
+// { tag: { gustMax, speedMin, speedMax, speedMean } } aus einer Monatsdatei
 function monthRecords(j) {
-  const ix = j.cols.indexOf('wind_gust_max_max');
+  const ix = {};
+  j.cols.forEach((c, i) => (ix[c] = i));
+  const g = (row, k) => (ix[k] != null && row[ix[k]] != null ? row[ix[k]] : null);
   const rec = {};
-  if (ix < 0) return rec;
-  for (const row of j.data) if (row[ix] != null) rec[row[0]] = row[ix];
+  for (const row of j.data) {
+    rec[row[0]] = {
+      gustMax: g(row, 'wind_gust_max_max'),
+      speedMin: g(row, 'wind_speed_min'),
+      speedMax: g(row, 'wind_speed_max'),
+      speedMean: g(row, 'wind_speed_mean'),
+    };
+  }
   return rec;
 }
 const isGronenberg = () => fc.cityIdx === GR_IDX;
@@ -88,6 +97,23 @@ function baseOptions(xTicks) {
 function line(label, data, color, extra = {}) {
   return { label, data, borderColor: color, backgroundColor: color, borderWidth: 2,
     pointRadius: 3, pointHoverRadius: 5, tension: 0, fill: false, spanGaps: true, ...extra };
+}
+
+// Tages-Band Windgeschwindigkeit: Flaeche Min-Max (neutral), Mittelwert-Linie
+// mit Segment-Faerbung nach Geschwindigkeits-Schwelle (windBorder).
+function speedBand(hi, lo, mean) {
+  return [
+    { label: '_speedmax', data: hi, borderColor: 'transparent', borderWidth: 0,
+      pointRadius: 0, fill: false, tension: 0, spanGaps: true },
+    { label: '_speedmin', data: lo, borderColor: 'transparent', borderWidth: 0,
+      pointRadius: 0, fill: '-1', backgroundColor: 'rgba(56,189,248,0.10)', tension: 0, spanGaps: true },
+    { label: 'Ø Windgeschwindigkeit', data: mean, borderWidth: 2, pointRadius: 2,
+      pointHoverRadius: 4, tension: 0, fill: false, spanGaps: true,
+      borderColor: C_WIND, backgroundColor: C_WIND,
+      segment: { borderColor: (ctx) => windBorder(ctx.p1.parsed.y ?? ctx.p0.parsed.y) },
+      pointBackgroundColor: mean.map((v) => (v == null ? C_WIND : windFill(v))),
+    },
+  ];
 }
 
 // Aktuell: bestehender Forecast-Balkenchart + pro Kalendertag eine Tages-Max-Linie.
@@ -144,15 +170,17 @@ async function cfgWoche(nDays) {
   for (const k of new Set([ym(today), shiftYm(ym(today), -1)])) {
     try { recs[k] = monthRecords(await loadMonth(k)); } catch (e) { /* Monat evtl. noch nicht da */ }
   }
-  const labels = [], vals = [];
+  const labels = [], vals = [], lo = [], hi = [], mean = [];
   for (let i = nDays - 1; i >= 0; i--) {
     const dt = new Date(today); dt.setDate(today.getDate() - i);
     labels.push(`${DOW[dt.getDay()]} ${dt.getDate()}.${dt.getMonth() + 1}.`);
-    let v = (recs[ym(dt)] || {})[dt.getDate()] ?? null;
+    const r = (recs[ym(dt)] || {})[dt.getDate()];
+    lo.push(r ? r.speedMin : null); hi.push(r ? r.speedMax : null); mean.push(r ? r.speedMean : null);
+    let v = r ? r.gustMax : null;
     if (i === 0 && liveGust() != null && (v == null || liveGust() > v)) v = liveGust();
     vals.push(v);
   }
-  return { type: 'line', data: { labels, datasets: [line('Tagesmax Böe', vals, C_WIND)] }, options: baseOptions(nDays) };
+  return { type: 'line', data: { labels, datasets: [...speedBand(hi, lo, mean), line('Tagesmax Böe', vals, C_WIND)] }, options: baseOptions(nDays) };
 }
 
 async function cfgMonat() {
@@ -160,14 +188,19 @@ async function cfgMonat() {
   try { rec = monthRecords(await loadMonth(monthCursor)); } catch (e) { /* Datei fehlt */ }
   const [y, m] = monthCursor.split('-').map(Number);
   const dim = new Date(y, m, 0).getDate();
-  const labels = [], vals = [];
-  for (let d = 1; d <= dim; d++) { labels.push(String(d)); vals.push(rec[d] ?? null); }
+  const labels = [], vals = [], lo = [], hi = [], mean = [];
+  for (let d = 1; d <= dim; d++) {
+    const r = rec[d];
+    labels.push(String(d));
+    vals.push(r ? r.gustMax : null);
+    lo.push(r ? r.speedMin : null); hi.push(r ? r.speedMax : null); mean.push(r ? r.speedMean : null);
+  }
   if (monthCursor === ym(new Date()) && liveGust() != null) {
     const i = new Date().getDate() - 1;
     if (vals[i] == null || liveGust() > vals[i]) vals[i] = liveGust();
   }
   monthEmpty = !vals.some((v) => v != null);
-  return { type: 'line', data: { labels, datasets: [line('Tagesmax Böe', vals, C_WIND, { pointRadius: 2 })] }, options: baseOptions(10) };
+  return { type: 'line', data: { labels, datasets: [...speedBand(hi, lo, mean), line('Tagesmax Böe', vals, C_WIND, { pointRadius: 2 })] }, options: baseOptions(10) };
 }
 
 const windYears = () => Object.keys((history && history.wind_gust_max_monthly) || {}).sort();

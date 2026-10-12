@@ -112,11 +112,11 @@ function rainDotColor(v) {
     if (v < 0.5) return 'rgba(74,222,128,0.95)'; if (v < 1.0) return 'rgba(250,204,21,0.95)';
     if (v < 2.0) return 'rgba(251,146,60,0.95)'; return 'rgba(239,68,68,0.95)';
 }
-function windFill(v) {
+export function windFill(v) {
     if (v <= 15) return 'rgba(74,222,128,0.80)'; if (v <= 25) return 'rgba(250,204,21,0.80)';
     if (v < 50) return 'rgba(251,146,60,0.82)'; return 'rgba(239,68,68,0.88)';
 }
-function windBorder(v) {
+export function windBorder(v) {
     if (v <= 15) return 'rgba(74,222,128,1)'; if (v <= 25) return 'rgba(250,204,21,1)';
     if (v < 50) return 'rgba(251,146,60,1)'; return 'rgba(239,68,68,1)';
 }
